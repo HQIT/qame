@@ -1,0 +1,52 @@
+services:
+  # 前端应用 - 包含boardgame.io客户端
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_SERVER: http://192.168.1.156:8000
+    image: localhost/hqit/boardgame-frontend:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_SERVER=http://192.168.1.156:8000
+    networks:
+      - boardgame-network
+
+  # boardgame.io服务器 - 使用官方推荐的方式
+  game-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: localhost/hqit/boardgame-server:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://boardgame_user:boardgame_pass@postgres:5432/boardgame_db
+    depends_on:
+      - postgres
+    networks:
+      - boardgame-network
+
+  # PostgreSQL数据库 - 生产环境使用
+  postgres:
+    image: dockerpull.pw/postgres:15-alpine
+    environment:
+      - POSTGRES_DB=boardgame_db
+      - POSTGRES_USER=boardgame_user
+      - POSTGRES_PASSWORD=boardgame_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - boardgame-network
+
+volumes:
+  postgres_data:
+
+networks:
+  boardgame-network:
+    driver: bridge 
