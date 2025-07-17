@@ -1,4 +1,5 @@
 import React from 'react';
+import AIBot from '../components/AIBot';
 
 /**
  * 井字棋游戏界面组件
@@ -16,10 +17,14 @@ import React from 'react';
  * @param {Object} moves - 可用的移动函数
  * @param {string} playerID - 当前玩家ID
  * @param {boolean} isActive - 当前玩家是否处于活动状态
+ * @param {boolean} enableAI - 是否启用AI Bot
  */
-const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
+const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false }) => {
   // 详细调试输出
-  console.log('[Board] 渲染', { playerID, isActive, ctxCurrentPlayer: ctx.currentPlayer, G });
+  console.log('[Board] 渲染', { playerID, isActive, ctxCurrentPlayer: ctx.currentPlayer, G, enableAI });
+
+  // 检查当前玩家是否是AI Bot（只有启用AI且是玩家1时才是AI）
+  const isAIPlayer = enableAI && playerID === '1';
 
   /**
    * 处理格子点击事件
@@ -47,7 +52,8 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
       isActive &&
       playerID !== null &&
       G.cells &&
-      G.cells[id] === null
+      G.cells[id] === null &&
+      !isAIPlayer // 只有人类玩家才能点击
     ) {
       // 🔧 重要：直接传递参数，让 boardgame.io 自己处理
       // 经过测试，这是正确的调用方式
@@ -67,7 +73,9 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
   console.log('游戏状态检查:', { 
     gameover: ctx.gameover, 
     cells: G.cells,
-    currentPlayer: ctx.currentPlayer 
+    currentPlayer: ctx.currentPlayer,
+    enableAI,
+    isAIPlayer
   });
   
   if (ctx.gameover) {
@@ -81,17 +89,35 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
       </div>;
     }
   } else {
+    const currentPlayerSymbol = getPlayerSymbol(ctx.currentPlayer);
+    const isCurrentPlayerAI = enableAI && ctx.currentPlayer === '1';
+    
     gameStatus = (
       <div style={{ textAlign: 'center', fontSize: '1.2rem', margin: '2rem 0' }}>
         当前玩家: <span style={{ color: getPlayerColor(ctx.currentPlayer) }}>
-          {getPlayerSymbol(ctx.currentPlayer)}
+          {currentPlayerSymbol}
         </span>
+        {isCurrentPlayerAI && <span style={{ marginLeft: '10px', fontSize: '1rem', color: '#FF9800' }}>
+          🤖 (AI Bot)
+        </span>}
       </div>
     );
   }
 
   return (
     <div>
+      {/* AI Bot 组件 - 只在启用AI时显示 */}
+      {enableAI && (
+        <AIBot 
+          G={G}
+          ctx={ctx}
+          moves={moves}
+          playerID={playerID}
+          isActive={isActive}
+          isAIPlayer={isAIPlayer}
+        />
+      )}
+      
       {gameStatus}
       <div style={{
         display: 'grid',
@@ -104,7 +130,7 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
           <button
             key={id}
             onClick={() => onClick(id)}
-            disabled={!isActive || cell !== null || ctx.gameover}
+            disabled={!isActive || cell !== null || ctx.gameover || isAIPlayer}
             style={{
               width: '100px',
               height: '100px',
@@ -113,9 +139,9 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive }) => {
               borderRadius: '10px',
               fontSize: '2rem',
               fontWeight: 'bold',
-              cursor: isActive && cell === null && !ctx.gameover ? 'pointer' : 'not-allowed',
+              cursor: isActive && cell === null && !ctx.gameover && !isAIPlayer ? 'pointer' : 'not-allowed',
               color: cell ? getPlayerColor(cell) : '#333',
-              opacity: isActive && cell === null && !ctx.gameover ? 1 : 0.8
+              opacity: isActive && cell === null && !ctx.gameover && !isAIPlayer ? 1 : 0.8
             }}
           >
             {cell ? getPlayerSymbol(cell) : ''}
