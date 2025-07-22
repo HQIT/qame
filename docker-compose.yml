@@ -6,15 +6,17 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_SERVER: http://192.168.1.156:8000
+        REACT_APP_API_SERVER: http://192.168.1.156:8001
     image: localhost/hqit/boardgame-frontend:latest
     ports:
       - "3000:3000"
     environment:
       - REACT_APP_SERVER=http://192.168.1.156:8000
+      - REACT_APP_API_SERVER=http://192.168.1.156:8001
     networks:
       - boardgame-network
 
-  # boardgame.io服务器 - 使用官方推荐的方式
+  # boardgame.io游戏服务器 - 专门处理游戏逻辑
   game-server:
     build:
       context: ./server
@@ -22,15 +24,31 @@ services:
     image: localhost/hqit/boardgame-server:latest
     ports:
       - "8000:8000"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - boardgame-network
+
+  # API服务器 - 专门处理业务逻辑（认证、AI等）
+  api-server:
+    build:
+      context: ./api-server
+      dockerfile: Dockerfile
+    image: localhost/hqit/boardgame-api-server:latest
+    ports:
       - "8001:8001"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://boardgame_user:boardgame_pass@postgres:5432/boardgame_db
-      - LLM_API_KEY=sk-93731c45692e40529633d2f1619c5da7
-      - LLM_API_ENDPOINT=https://chat.ecnu.edu.cn/open/api/v1/chat/completions
-      - LLM_MODEL=ecnu-max
+      - DB_HOST=postgres
+      - DB_NAME=boardgame_db
+      - DB_USER=boardgame_user
+      - DB_PASSWORD=boardgame_pass
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     depends_on:
       - postgres
+      - redis
     networks:
       - boardgame-network
 
@@ -48,8 +66,19 @@ services:
     networks:
       - boardgame-network
 
+  # Redis缓存 - 会话和房间状态
+  redis:
+    image: dockerpull.pw/redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - boardgame-network
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   boardgame-network:
