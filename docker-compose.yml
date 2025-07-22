@@ -11,9 +11,6 @@ services:
       - "3000:3000"
     environment:
       - REACT_APP_SERVER=http://192.168.1.156:8000
-      - REACT_APP_OPENAI_API_KEY=sk-93731c45692e40529633d2f1619c5da7
-      - REACT_APP_LLM_API_ENDPOINT=https://chat.ecnu.edu.cn/open/api/v1/chat/completions
-      - REACT_APP_LLM_MODEL=ecnu-max
     networks:
       - boardgame-network
 
@@ -25,9 +22,13 @@ services:
     image: localhost/hqit/boardgame-server:latest
     ports:
       - "8000:8000"
+      - "8001:8001"
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://boardgame_user:boardgame_pass@postgres:5432/boardgame_db
+      - LLM_API_KEY=sk-93731c45692e40529633d2f1619c5da7
+      - LLM_API_ENDPOINT=https://chat.ecnu.edu.cn/open/api/v1/chat/completions
+      - LLM_MODEL=ecnu-max
     depends_on:
       - postgres
     networks:
