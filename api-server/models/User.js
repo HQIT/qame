@@ -4,7 +4,7 @@ const { query } = require('../config/database');
 
 class User {
   // 创建新用户
-  static async create(username, password) {
+  static async create(username, password, role = 'user') {
     try {
       // 检查用户名是否已存在
       const existingUser = await query(
@@ -22,8 +22,8 @@ class User {
       
       // 插入新用户
       const result = await query(
-        'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, created_at',
-        [username, passwordHash]
+        'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
+        [username, passwordHash, role]
       );
 
       return result.rows[0];
@@ -203,6 +203,24 @@ class User {
       return result.rows[0];
     } catch (error) {
       console.error('创建Admin用户失败:', error);
+      throw error;
+    }
+  }
+
+  // 获取用户统计信息
+  static async getStats() {
+    try {
+      const result = await query(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN role = 'admin' THEN 1 END) as admin_count,
+          COUNT(CASE WHEN role = 'user' THEN 1 END) as user_count
+        FROM users
+      `);
+      
+      return result.rows[0];
+    } catch (error) {
+      console.error('获取用户统计失败:', error);
       throw error;
     }
   }

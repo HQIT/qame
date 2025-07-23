@@ -11,31 +11,32 @@ function App() {
   // 检查用户是否已登录
   useEffect(() => {
     const checkAuth = async () => {
-      const savedUser = sessionStorage.getItem('user');
+      try {
+        // 始终验证Cookie中的token是否有效
+        const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/verify`, {
+          method: 'GET',
+          credentials: 'include' // 自动发送Cookie
+        });
 
-      if (savedUser) {
-        try {
-          // 验证Cookie中的token是否有效
-          const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/verify`, {
-            method: 'GET',
-            credentials: 'include' // 自动发送Cookie
-          });
-
-          const data = await response.json();
-          
-          if (data.code === 200) {
-            setUser(JSON.parse(savedUser));
-          } else {
-            // token无效，清除本地存储
-            sessionStorage.removeItem('user');
-          }
-        } catch (error) {
-          console.error('验证token失败:', error);
+        const data = await response.json();
+        
+        if (data.code === 200) {
+          // token有效，设置用户信息
+          setUser(data.data);
+          // 保存用户信息到sessionStorage
+          sessionStorage.setItem('user', JSON.stringify(data.data));
+        } else {
+          // token无效，清除本地存储
           sessionStorage.removeItem('user');
+          setUser(null);
         }
+      } catch (error) {
+        console.error('验证token失败:', error);
+        sessionStorage.removeItem('user');
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
     checkAuth();

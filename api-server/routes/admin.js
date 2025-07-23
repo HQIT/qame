@@ -36,6 +36,74 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// 创建新用户
+router.post('/users', async (req, res) => {
+  try {
+    const { username, password, role = 'user' } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        code: 400,
+        message: '用户名和密码不能为空',
+        data: null
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({
+        code: 400,
+        message: '用户名长度必须在3-20个字符之间',
+        data: null
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        code: 400,
+        message: '密码长度不能少于6个字符',
+        data: null
+      });
+    }
+
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({
+        code: 400,
+        message: '角色必须是user或admin',
+        data: null
+      });
+    }
+
+    // 创建用户
+    const newUser = await User.create(username, password, role);
+
+    res.json({
+      code: 200,
+      message: '创建用户成功',
+      data: {
+        id: newUser.id,
+        username: newUser.username,
+        role: role,
+        createdAt: newUser.created_at
+      }
+    });
+  } catch (error) {
+    console.error('创建用户失败:', error);
+    if (error.message === '用户名已存在') {
+      res.status(409).json({
+        code: 409,
+        message: '用户名已存在',
+        data: null
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        message: '服务器内部错误',
+        data: null
+      });
+    }
+  }
+});
+
 // 更新用户信息
 router.put('/users/:id', async (req, res) => {
   try {
@@ -46,6 +114,14 @@ router.put('/users/:id', async (req, res) => {
       return res.status(400).json({
         code: 400,
         message: '用户名不能为空',
+        data: null
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({
+        code: 400,
+        message: '用户名长度必须在3-20个字符之间',
         data: null
       });
     }
@@ -89,7 +165,7 @@ router.delete('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
     
     // 不能删除自己
-    if (userId === req.adminUser.id) {
+    if (userId === req.user.userId) {
       return res.status(400).json({
         code: 400,
         message: '不能删除自己的账户',
@@ -98,19 +174,11 @@ router.delete('/users/:id', async (req, res) => {
     }
 
     const deletedUser = await User.delete(userId);
-    
-    if (!deletedUser) {
-      return res.status(404).json({
-        code: 404,
-        message: '用户不存在',
-        data: null
-      });
-    }
 
     res.json({
       code: 200,
       message: '删除用户成功',
-      data: { id: deletedUser.id }
+      data: deletedUser
     });
   } catch (error) {
     console.error('删除用户失败:', error);
@@ -125,30 +193,12 @@ router.delete('/users/:id', async (req, res) => {
 // 获取系统统计信息
 router.get('/stats', async (req, res) => {
   try {
-    // 获取用户统计
-    const userStats = await User.getStats();
-    
-    // 获取房间统计（暂时返回模拟数据）
-    const roomStats = {
-      total: 0,
-      active: 0,
-      waiting: 0
-    };
-    
-    // 获取在线用户统计（暂时返回模拟数据）
-    const onlineStats = {
-      total: 0,
-      users: []
-    };
+    const stats = await User.getStats();
 
     res.json({
       code: 200,
       message: '获取系统统计成功',
-      data: {
-        users: userStats,
-        rooms: roomStats,
-        online: onlineStats
-      }
+      data: stats
     });
   } catch (error) {
     console.error('获取系统统计失败:', error);

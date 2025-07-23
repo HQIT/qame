@@ -95,4 +95,35 @@ jspm_packages/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Test files
+test_*.js
+test_*.sh
+*.test.js
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+nginx/ssl/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+generate-ssl.sh
