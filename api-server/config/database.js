@@ -28,13 +28,27 @@ async function runMigrations() {
     const fs = require('fs');
     const path = require('path');
     
-    // 读取迁移文件
-    const migrationPath = path.join(__dirname, '../migrations/001_initial_schema.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+    // 迁移文件列表（按顺序执行）
+    const migrationFiles = [
+      '001_initial_schema.sql',
+      '002_add_user_role.sql',
+      '003_add_refresh_tokens.sql',
+      '004_add_user_salt.sql',
+      '005_update_existing_users_salt.sql',
+      '006_remove_user_salt.sql'
+    ];
     
-    // 执行迁移
-    await pool.query(migrationSQL);
-    console.log('✅ 数据库迁移执行成功');
+    for (const migrationFile of migrationFiles) {
+      console.log(`🔄 执行迁移: ${migrationFile}`);
+      const migrationPath = path.join(__dirname, '../migrations', migrationFile);
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      
+      // 执行迁移
+      await pool.query(migrationSQL);
+      console.log(`✅ 迁移完成: ${migrationFile}`);
+    }
+    
+    console.log('✅ 所有数据库迁移执行成功');
   } catch (error) {
     console.error('❌ 数据库迁移失败:', error);
     throw error;

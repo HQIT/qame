@@ -1,18 +1,20 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 
 const router = express.Router();
 
 // 用户登录
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, hashedPassword } = req.body;
 
     // 验证输入
-    if (!username || !password) {
+    if (!username || !hashedPassword) {
       return res.status(400).json({
         code: 400,
         message: '用户名和密码不能为空',
@@ -30,9 +32,22 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 验证密码
-    const isValidPassword = await User.verifyPassword(password, user.password_hash);
-    if (!isValidPassword) {
+    // 使用统一的salt进行密码验证
+    // 前端发送：hash(password + UNIFIED_SALT)
+    // 后端验证：使用相同的UNIFIED_SALT重新计算哈希
+    const UNIFIED_SALT = process.env.PASSWORD_SALT || 'your_fixed_salt_here';
+    
+    // 验证哈希格式（64位十六进制）
+    if (!/^[a-f0-9]{64}$/.test(hashedPassword)) {
+      return res.status(401).json({
+        code: 401,
+        message: '用户名或密码错误',
+        data: null
+      });
+    }
+    
+    // 直接比较前端发送的哈希与数据库中存储的哈希
+    if (hashedPassword !== user.password_hash) {
       return res.status(401).json({
         code: 401,
         message: '用户名或密码错误',
@@ -40,21 +55,43 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 生成JWT token
-    const token = jwt.sign(
+    // 生成Access Token（短期）
+    const accessToken = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '15m' }  // 15分钟
     );
+
+    // 生成Refresh Token（长期）
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7天
+
+    // 保存Refresh Token到数据库
+    await RefreshToken.create(user.id, refreshToken, refreshTokenExpiresAt);
+
+    // 设置HttpOnly Cookie
+    res.cookie('access_token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // 生产环境使用HTTPS
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000  // 15分钟
+    });
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // 生产环境使用HTTPS
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000  // 7天
+    });
 
     res.json({
       code: 200,
       message: '登录成功',
       data: {
-        token,
         user: {
           id: user.id,
           username: user.username,
+          role: user.role,
           createdAt: user.created_at
         }
       }
@@ -88,6 +125,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       data: {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.created_at
       }
     });
@@ -120,6 +158,7 @@ router.get('/verify', authenticateToken, async (req, res) => {
       data: {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.created_at
       }
     });
@@ -174,12 +213,114 @@ router.put('/profile', authenticateToken, async (req, res) => {
       data: {
         id: updatedUser.id,
         username: updatedUser.username,
+        role: updatedUser.role,
         createdAt: updatedUser.created_at
       }
     });
 
   } catch (error) {
     console.error('更新用户信息错误:', error);
+    res.status(500).json({
+      code: 500,
+      message: '服务器内部错误',
+      data: null
+    });
+  }
+});
+
+// Token刷新API
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refresh_token;
+    
+    if (!refreshToken) {
+      return res.status(401).json({
+        code: 401,
+        message: 'Refresh Token不存在',
+        data: null
+      });
+    }
+
+    // 验证Refresh Token
+    const tokenRecord = await RefreshToken.findByToken(refreshToken);
+    if (!tokenRecord) {
+      return res.status(401).json({
+        code: 401,
+        message: 'Refresh Token无效',
+        data: null
+      });
+    }
+
+    // 获取用户信息
+    const user = await User.findById(tokenRecord.user_id);
+    if (!user) {
+      return res.status(401).json({
+        code: 401,
+        message: '用户不存在',
+        data: null
+      });
+    }
+
+    // 生成新的Access Token
+    const newAccessToken = jwt.sign(
+      { userId: user.id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    // 设置新的Access Token Cookie
+    res.cookie('access_token', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.json({
+      code: 200,
+      message: 'Token刷新成功',
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          createdAt: user.created_at
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Token刷新失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '服务器内部错误',
+      data: null
+    });
+  }
+});
+
+// 登出API
+router.post('/logout', async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refresh_token;
+    
+    if (refreshToken) {
+      // 删除Refresh Token
+      await RefreshToken.deleteByToken(refreshToken);
+    }
+
+    // 清除Cookie
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+
+    res.json({
+      code: 200,
+      message: '登出成功',
+      data: null
+    });
+
+  } catch (error) {
+    console.error('登出失败:', error);
     res.status(500).json({
       code: 500,
       message: '服务器内部错误',

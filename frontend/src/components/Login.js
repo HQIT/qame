@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { hashPasswordForTransmission } from '../utils/crypto';
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
@@ -14,21 +15,27 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
+      // 对密码进行哈希处理
+      const { hashedPassword } = await hashPasswordForTransmission(formData.password);
+      
       const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        credentials: 'include', // 包含cookies
+        body: JSON.stringify({
+          username: formData.username,
+          hashedPassword
+        })
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        // 保存token到localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        onLogin(data.user);
+      if (data.code === 200) {
+        // 保存用户信息到Session Storage（页面级缓存）
+        sessionStorage.setItem('user', JSON.stringify(data.data.user));
+        onLogin(data.data.user);
       } else {
         setError(data.message || '登录失败');
       }

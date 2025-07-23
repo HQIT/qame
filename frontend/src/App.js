@@ -1,40 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import GameSelector from './components/GameSelector';
 import Login from './components/Login';
+import AdminPanel from './components/AdminPanel';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentView, setCurrentView] = useState('games');
 
   // 检查用户是否已登录
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
+      const savedUser = sessionStorage.getItem('user');
 
-      if (token && savedUser) {
+      if (savedUser) {
         try {
-          // 验证token是否有效
+          // 验证Cookie中的token是否有效
           const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/verify`, {
             method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
+            credentials: 'include' // 自动发送Cookie
           });
 
           const data = await response.json();
           
-          if (data.success) {
+          if (data.code === 200) {
             setUser(JSON.parse(savedUser));
           } else {
             // token无效，清除本地存储
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            sessionStorage.removeItem('user');
           }
         } catch (error) {
           console.error('验证token失败:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          sessionStorage.removeItem('user');
         }
       }
       
@@ -48,9 +45,18 @@ function App() {
     setUser(userData);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    try {
+      // 调用登出API清除Cookie
+      await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('登出失败:', error);
+    }
+    
+    sessionStorage.removeItem('user');
     setUser(null);
   };
 
@@ -99,6 +105,23 @@ function App() {
             <span style={{ marginRight: '15px' }}>
               欢迎，{user.username}！
             </span>
+            {user.role === 'admin' && (
+              <button
+                onClick={() => setCurrentView(currentView === 'admin' ? 'games' : 'admin')}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid white',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  marginRight: '10px'
+                }}
+              >
+                {currentView === 'admin' ? '返回游戏' : '管理控制台'}
+              </button>
+            )}
             <button
               onClick={handleLogout}
               style={{
@@ -117,7 +140,7 @@ function App() {
         </div>
 
         {/* 游戏内容 */}
-        <GameSelector />
+        {currentView === 'admin' ? <AdminPanel /> : <GameSelector />}
       </div>
     );
   }

@@ -4,6 +4,13 @@
 
 构建一个支持多种游戏的多人游戏平台，支持AI玩家和人类玩家对战。
 
+## 重要说明
+
+**本项目不提供用户注册功能，所有用户账户由管理员通过管理控制台创建。**
+- 用户无法自行注册账户
+- 管理员可以通过管理控制台创建新用户
+- 系统启动时会自动创建默认管理员账户（用户名：admin，密码：admin123）
+
 ## 技术架构
 
 ### 后端技术栈
@@ -22,10 +29,12 @@
 
 ### 部署架构
 - **容器化**: Docker + Docker Compose
+- **HTTPS支持**: Nginx反向代理 + SSL证书
 - **服务分离**:
-  - `frontend` (端口3000) - React前端
-  - `game-server` (端口8000) - boardgame.io游戏服务器
-  - `api-server` (端口8001) - Express API服务器
+  - `nginx` (端口80/443) - HTTPS反向代理
+  - `frontend` (内部端口3000) - React前端
+  - `game-server` (内部端口8000) - boardgame.io游戏服务器
+  - `api-server` (内部端口8001) - Express API服务器
   - `postgres` (端口5432) - PostgreSQL数据库
   - `redis` (端口6379) - Redis缓存
 
@@ -171,12 +180,19 @@ CREATE TABLE game_sessions (
 ## API设计
 
 ### 认证API (`/api/auth`)
-- `POST /register` - 用户注册
 - `POST /login` - 用户登录
 - `POST /logout` - 用户登出
 - `GET /profile` - 获取用户信息
 - `PUT /profile` - 更新用户信息
 - `GET /verify` - 验证token
+
+**注意：本项目不提供用户注册功能，所有用户账户由管理员通过管理控制台创建。**
+
+### Admin API (`/api/admin`)
+- `GET /users` - 获取用户列表
+- `PUT /users/:id` - 更新用户信息
+- `DELETE /users/:id` - 删除用户
+- `GET /stats` - 获取系统统计
 
 ### AI API (`/api/ai`)
 - `GET /types` - 获取AI类型列表
@@ -198,6 +214,11 @@ CREATE TABLE game_sessions (
 - [x] Docker配置更新
 - [x] 服务分离架构
 - [x] API响应格式标准化
+- [x] Admin用户角色系统
+- [x] Admin权限控制
+- [x] Admin UI界面
+- [x] 用户管理功能
+- [x] 系统统计功能
 
 ### 第二阶段：AI系统
 - [ ] AI提供商管理
@@ -267,9 +288,9 @@ docker-compose down
 ```
 
 ### 服务端口
-- 前端: http://localhost:3000
-- 游戏服务器: http://localhost:8000
-- API服务器: http://localhost:8001
+- 前端: https://localhost (通过Nginx)
+- 游戏服务器: https://localhost/games (通过Nginx)
+- API服务器: https://localhost/api (通过Nginx)
 - 数据库: localhost:5432
 - Redis: localhost:6379
 
