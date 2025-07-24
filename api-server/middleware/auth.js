@@ -29,8 +29,14 @@ function verifyToken(token) {
 // 认证中间件
 async function authenticateToken(req, res, next) {
   try {
+    // 优先从Authorization header获取token，其次从Cookie获取
+    let token = null;
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    if (authHeader && authHeader.split(' ')[1]) {
+      token = authHeader.split(' ')[1]; // Bearer TOKEN
+    } else if (req.cookies && req.cookies.access_token) {
+      token = req.cookies.access_token;
+    }
     
     if (!token) {
       return res.status(401).json({ 
@@ -47,14 +53,18 @@ async function authenticateToken(req, res, next) {
       });
     }
     
+    console.log('🔍 Token解码结果:', decoded);
+    
     // 验证用户是否仍然存在
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(401).json({ 
         error: '用户不存在',
         message: '用户已被删除，请重新登录' 
       });
     }
+    
+    console.log('👤 找到用户:', { id: user.id, username: user.username, role: user.role });
     
     // 将用户信息添加到请求对象
     req.user = user;
@@ -98,15 +108,17 @@ async function authenticateAdmin(req, res, next) {
     await authenticateToken(req, res, (err) => {
       if (err) return next(err);
       
-      // 检查是否为管理员（这里可以根据需要扩展管理员逻辑）
-      // 暂时使用简单的用户名检查
-      const adminUsernames = ['admin', 'administrator'];
-      if (!adminUsernames.includes(req.user.username)) {
+      // 检查是否为管理员（检查role字段）
+      console.log('🔐 管理员权限检查:', { username: req.user.username, role: req.user.role });
+      if (req.user.role !== 'admin') {
+        console.log('❌ 权限不足:', req.user.role);
         return res.status(403).json({ 
           error: '权限不足',
           message: '需要管理员权限' 
         });
       }
+      
+      console.log('✅ 管理员权限验证通过');
       
       next();
     });

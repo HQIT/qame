@@ -141,9 +141,35 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 // 验证token
-router.get('/verify', authenticateToken, async (req, res) => {
+router.get('/verify', async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    // 手动处理token验证
+    let token = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.split(' ')[1]) {
+      token = authHeader.split(' ')[1]; // Bearer TOKEN
+    } else if (req.cookies && req.cookies.access_token) {
+      token = req.cookies.access_token;
+    }
+    
+    if (!token) {
+      return res.status(401).json({
+        code: 401,
+        message: '访问令牌缺失',
+        data: null
+      });
+    }
+    
+    const decoded = require('../middleware/auth').verifyToken(token);
+    if (!decoded) {
+      return res.status(401).json({
+        code: 401,
+        message: '令牌已过期或无效，请重新登录',
+        data: null
+      });
+    }
+    
+    const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(404).json({
         code: 404,

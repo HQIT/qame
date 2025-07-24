@@ -2,38 +2,41 @@ import React, { useState, useEffect } from 'react';
 import GameSelector from './components/GameSelector';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
+import { api } from './utils/api';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('games');
+  const [currentView, setCurrentView] = useState(() => {
+    // 从sessionStorage恢复视图状态
+    return sessionStorage.getItem('currentView') || 'games';
+  });
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // 检查用户是否已登录
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // 始终验证Cookie中的token是否有效
-        const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/verify`, {
-          method: 'GET',
-          credentials: 'include' // 自动发送Cookie
-        });
-
-        const data = await response.json();
+        const data = await api.verify();
         
         if (data.code === 200) {
           // token有效，设置用户信息
           setUser(data.data);
+          // 检查是否为管理员
+          setIsAdmin(data.data.role === 'admin');
           // 保存用户信息到sessionStorage
           sessionStorage.setItem('user', JSON.stringify(data.data));
         } else {
           // token无效，清除本地存储
           sessionStorage.removeItem('user');
           setUser(null);
+          setIsAdmin(false);
         }
       } catch (error) {
         console.error('验证token失败:', error);
         sessionStorage.removeItem('user');
         setUser(null);
+        setIsAdmin(false);
       } finally {
         setLoading(false);
       }
@@ -44,21 +47,27 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    setIsAdmin(userData.role === 'admin');
   };
 
   const handleLogout = async () => {
     try {
-      // 调用登出API清除Cookie
-      await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      await api.logout();
     } catch (error) {
       console.error('登出失败:', error);
     }
     
     sessionStorage.removeItem('user');
+    sessionStorage.removeItem('currentView');
+    sessionStorage.removeItem('adminActiveTab');
     setUser(null);
+    setIsAdmin(false);
+    setCurrentView('games');
+  };
+
+  const handleViewChange = (newView) => {
+    setCurrentView(newView);
+    sessionStorage.setItem('currentView', newView);
   };
 
   if (loading) {
@@ -106,9 +115,9 @@ function App() {
             <span style={{ marginRight: '15px' }}>
               欢迎，{user.username}！
             </span>
-            {user.role === 'admin' && (
+            {isAdmin && (
               <button
-                onClick={() => setCurrentView(currentView === 'admin' ? 'games' : 'admin')}
+                onClick={() => handleViewChange(currentView === 'admin' ? 'games' : 'admin')}
                 style={{
                   backgroundColor: 'transparent',
                   border: '1px solid white',

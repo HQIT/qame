@@ -2,43 +2,51 @@
 
 ## 当前问题
 
-### 2024-12-19 - 登录持久化问题
+### 2024-12-19 - 系统统计显示问题
 
 **问题描述：**
-用户登录后，刷新浏览器页面需要重新登录，无法保持登录状态。
+管理员控制台中的系统统计显示用户数为0，但实际系统中至少有2个用户（hello和admin）。
 
 **问题表现：**
-1. 用户成功登录后，sessionStorage中保存了用户信息
-2. 刷新浏览器页面后，sessionStorage被清空
-3. 前端检测到sessionStorage为空，要求用户重新登录
-4. 但实际上Cookie中的JWT token仍然有效
+1. 进入管理员控制台 > 系统统计
+2. 用户数显示为0
+3. 但实际数据库中应该有hello和admin两个用户
 
-**已尝试的解决方案：**
-1. 修改了 `frontend/src/App.js` 中的认证逻辑
-2. 改为始终验证Cookie中的token，不依赖sessionStorage
-3. 但问题仍然存在
-
-**技术细节：**
-- 前端使用React + sessionStorage存储用户信息
-- 后端使用JWT token存储在HttpOnly Cookie中
-- 刷新页面时sessionStorage被清空，但Cookie中的token仍然有效
-- 需要找到正确的token验证和用户状态恢复机制
+**可能原因：**
+1. 统计API `/api/admin/stats` 的查询逻辑有问题
+2. 数据库连接或查询语句有误
+3. 统计API的权限验证有问题
 
 **待解决：**
-- 需要进一步调试token验证API是否正常工作
-- 检查Cookie是否正确设置和传递
-- 验证前端认证逻辑是否正确处理token验证响应
+- 检查统计API的实现逻辑
+- 验证数据库查询是否正确
+- 确认API权限设置
 
 **相关文件：**
-- `frontend/src/App.js` - 前端认证逻辑
-- `api-server/routes/auth.js` - 后端认证API
-- `frontend/src/components/Login.js` - 登录组件
+- `api-server/routes/admin.js` - 统计API实现
+- `api-server/models/User.js` - 用户模型
+- `frontend/src/components/admin/SystemStats.js` - 前端统计组件
 
-**优先级：** 高 - 影响用户体验
+**优先级：** 中 - 影响管理员功能
 
 ---
 
 ## 已解决的问题
+
+### 2024-12-19 - 登录持久化问题
+**状态：** 已解决
+**解决方案：** 
+1. 统一API调用方式，创建 `frontend/src/utils/api.js` 统一API工具
+2. 所有API调用都使用 `credentials: 'include'` 发送Cookie
+3. 移除了所有使用 `localStorage.getItem('token')` 和 `Authorization: Bearer` 的代码
+4. 修改了 `api-server/middleware/auth.js` 支持Cookie认证
+5. 修改了 `api-server/routes/auth.js` 中的 `/verify` 路由，移除循环依赖
+
+**相关文件：**
+- `frontend/src/utils/api.js` - 统一API工具
+- `frontend/src/App.js` - 前端认证逻辑
+- `api-server/middleware/auth.js` - 认证中间件
+- `api-server/routes/auth.js` - 认证API
 
 ### 2024-12-19 - 管理员控制台用户管理问题
 **状态：** 已解决

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../utils/api';
 
 const SystemStats = () => {
   const [stats, setStats] = useState(null);
@@ -10,14 +11,8 @@ const SystemStats = () => {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
+      const data = await api.getStats();
+      
       if (data.code === 200) {
         setStats(data.data);
       }

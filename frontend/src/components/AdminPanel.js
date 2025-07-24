@@ -3,7 +3,10 @@ import UserManagement from './admin/UserManagement';
 import SystemStats from './admin/SystemStats';
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState(() => {
+    // 从sessionStorage恢复tab状态，默认为'users'
+    return sessionStorage.getItem('adminActiveTab') || 'users';
+  });
 
   return (
     <div style={{ padding: '20px' }}>
@@ -30,7 +33,10 @@ const AdminPanel = () => {
           borderBottom: '1px solid #eee'
         }}>
           <button
-            onClick={() => setActiveTab('stats')}
+            onClick={() => {
+              setActiveTab('stats');
+              sessionStorage.setItem('adminActiveTab', 'stats');
+            }}
             style={{
               padding: '15px 25px',
               border: 'none',
@@ -44,7 +50,10 @@ const AdminPanel = () => {
             📊 系统统计
           </button>
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => {
+              setActiveTab('users');
+              sessionStorage.setItem('adminActiveTab', 'users');
+            }}
             style={{
               padding: '15px 25px',
               border: 'none',
