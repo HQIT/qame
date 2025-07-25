@@ -9,6 +9,8 @@ const authRoutes = require('./routes/auth');
 const aiRoutes = require('./routes/ai');
 const adminRoutes = require('./routes/admin');
 const adminAIRoutes = require('./routes/adminAI');
+const roomRoutes = require('./routes/rooms');
+const gameRoutes = require('./routes/games');
 
 const app = express();
 
@@ -57,6 +59,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', adminAIRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/games', gameRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

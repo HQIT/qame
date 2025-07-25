@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import GameSelector from './components/GameSelector';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
+import RoomList from './components/rooms/RoomList';
+import RoomDetail from './components/rooms/RoomDetail';
 import { api } from './utils/api';
 
 function App() {
@@ -12,6 +14,7 @@ function App() {
     return sessionStorage.getItem('currentView') || 'games';
   });
   const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
 
   // 检查用户是否已登录
   useEffect(() => {
@@ -68,6 +71,15 @@ function App() {
   const handleViewChange = (newView) => {
     setCurrentView(newView);
     sessionStorage.setItem('currentView', newView);
+    setSelectedRoom(null); // 切换视图时清除选中的房间
+  };
+
+  const handleRoomSelect = (room) => {
+    setSelectedRoom(room);
+  };
+
+  const handleRoomBack = () => {
+    setSelectedRoom(null);
   };
 
   if (loading) {
@@ -115,23 +127,57 @@ function App() {
             <span style={{ marginRight: '15px' }}>
               欢迎，{user.username}！
             </span>
-            {isAdmin && (
+            
+            {/* 导航按钮 */}
+            <div style={{ display: 'flex', gap: '10px', marginRight: '15px' }}>
               <button
-                onClick={() => handleViewChange(currentView === 'admin' ? 'games' : 'admin')}
+                onClick={() => handleViewChange('games')}
                 style={{
-                  backgroundColor: 'transparent',
+                  backgroundColor: currentView === 'games' ? 'rgba(255,255,255,0.2)' : 'transparent',
                   border: '1px solid white',
                   color: 'white',
                   padding: '8px 16px',
                   borderRadius: '5px',
                   cursor: 'pointer',
-                  fontSize: '14px',
-                  marginRight: '10px'
+                  fontSize: '14px'
                 }}
               >
-                {currentView === 'admin' ? '返回游戏' : '管理控制台'}
+                游戏大厅
               </button>
-            )}
+              
+              <button
+                onClick={() => handleViewChange('rooms')}
+                style={{
+                  backgroundColor: currentView === 'rooms' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  border: '1px solid white',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                房间系统
+              </button>
+              
+              {isAdmin && (
+                <button
+                  onClick={() => handleViewChange(currentView === 'admin' ? 'games' : 'admin')}
+                  style={{
+                    backgroundColor: currentView === 'admin' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    border: '1px solid white',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  {currentView === 'admin' ? '返回游戏' : '管理控制台'}
+                </button>
+              )}
+            </div>
+            
             <button
               onClick={handleLogout}
               style={{
@@ -150,7 +196,17 @@ function App() {
         </div>
 
         {/* 游戏内容 */}
-        {currentView === 'admin' ? <AdminPanel /> : <GameSelector />}
+        {currentView === 'admin' ? (
+          <AdminPanel />
+        ) : currentView === 'rooms' ? (
+          selectedRoom ? (
+            <RoomDetail roomId={selectedRoom.id} onBack={handleRoomBack} />
+          ) : (
+            <RoomList onRoomSelect={handleRoomSelect} />
+          )
+        ) : (
+          <GameSelector />
+        )}
       </div>
     );
   }

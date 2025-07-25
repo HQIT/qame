@@ -71,5 +71,32 @@ export const api = {
     method: 'PUT',
     body: JSON.stringify(typeData)
   }),
-  deleteAIType: (typeId) => apiCall(`/api/admin/ai-types/${typeId}`, { method: 'DELETE' })
+  deleteAIType: (typeId) => apiCall(`/api/admin/ai-types/${typeId}`, { method: 'DELETE' }),
+
+  // 游戏相关
+  getGames: () => apiCall('/api/games'),
+
+  // 房间相关
+  getRooms: () => apiCall('/api/rooms'),
+  createRoom: (roomData) => apiCall('/api/rooms', {
+    method: 'POST',
+    body: JSON.stringify(roomData)
+  }),
+  getRoom: (roomId) => apiCall(`/api/rooms/${roomId}`),
+  deleteRoom: (roomId) => apiCall(`/api/rooms/${roomId}`, { method: 'DELETE' }),
+  
+  // 座位相关
+  joinSeat: (roomId, seatNumber) => apiCall(`/api/rooms/${roomId}/seats/${seatNumber}/join`, {
+    method: 'POST'
+  }),
+  leaveSeat: (roomId, seatNumber) => apiCall(`/api/rooms/${roomId}/seats/${seatNumber}/leave`, {
+    method: 'POST'
+  }),
+  setAISeat: (roomId, seatNumber, aiTypeId) => apiCall(`/api/rooms/${roomId}/seats/${seatNumber}/ai`, {
+    method: 'POST',
+    body: JSON.stringify({ aiTypeId })
+  }),
+  removeAISeat: (roomId, seatNumber) => apiCall(`/api/rooms/${roomId}/seats/${seatNumber}/ai`, {
+    method: 'DELETE'
+  })
 }; 
