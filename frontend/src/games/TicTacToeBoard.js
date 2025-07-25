@@ -18,15 +18,27 @@ import LLMBot from '../components/LLMBot';
  * @param {Object} moves - 可用的移动函数
  * @param {string} playerID - 当前玩家ID
  * @param {boolean} isActive - 当前玩家是否处于活动状态
- * @param {boolean} enableAI - 是否启用AI Bot
- * @param {string} aiType - AI类型: 'traditional' | 'llm' | 'none'
+ * @param {boolean} enableAI - 是否启用AI Bot（兼容旧版本）
+ * @param {string} aiType - AI类型（兼容旧版本）
+ * @param {Object} setupData - 设置数据（新版本）
  */
-const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none' }) => {
+const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none', setupData }) => {
   // 详细调试输出
-  console.log('[Board] 渲染', { playerID, isActive, ctxCurrentPlayer: ctx.currentPlayer, G, enableAI, aiType });
+  console.log('[Board] 渲染', { 
+    playerID, 
+    isActive, 
+    ctxCurrentPlayer: ctx.currentPlayer, 
+    G, 
+    enableAI, 
+    aiType,
+    setupData,
+    aiConfig: G.aiConfig
+  });
 
-  // 检查当前玩家是否是AI Bot（只有启用AI且是玩家1时才是AI）
-  const isAIPlayer = enableAI && playerID === '1';
+  // 优先使用游戏状态中的AI配置，兼容旧版本的enableAI参数
+  const isAIPlayer = (G.aiConfig?.enabled || enableAI) && playerID === '1';
+  const currentAiType = G.aiConfig?.aiTypeName || aiType;
+  const isCurrentPlayerAI = isAIPlayer && isActive;
   
   // 根据AI类型选择对应的Bot组件
   const getBotComponent = () => {
@@ -42,7 +54,7 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
       return null;
     }
     
-    switch (aiType) {
+    switch (currentAiType) {
       case 'traditional':
         console.log('🎮 选择传统AI Bot');
         return (
@@ -138,13 +150,12 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
     }
   } else {
     const currentPlayerSymbol = getPlayerSymbol(ctx.currentPlayer);
-    const isCurrentPlayerAI = enableAI && ctx.currentPlayer === '1';
     
     // 根据AI类型显示不同的标签
     const getAILabel = () => {
       if (!isCurrentPlayerAI) return null;
       
-      switch (aiType) {
+      switch (currentAiType) {
         case 'traditional':
           return <span style={{ marginLeft: '10px', fontSize: '1rem', color: '#FF9800' }}>
             🤖 (传统AI)
@@ -171,11 +182,43 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
   }
 
   return (
-    <div>
-      {/* AI Bot 组件 - 根据AI类型显示对应的Bot */}
-      {getBotComponent()}
-      
-      {gameStatus}
+    <div style={{ textAlign: 'center', padding: '20px' }}>
+      {/* 游戏状态显示 */}
+      <div style={{ marginBottom: '20px' }}>
+        {ctx.gameover ? (
+          <div>
+            <h2 style={{ color: '#4caf50' }}>
+              {ctx.gameover.winner ? `玩家 ${ctx.gameover.winner} 获胜！` : '游戏平局！'}
+            </h2>
+            <button
+              onClick={() => moves.restartGame()}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#2196f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                marginTop: '10px'
+              }}
+            >
+              重新开始
+            </button>
+          </div>
+        ) : (
+          <div>
+            <h3>当前玩家: {ctx.currentPlayer}</h3>
+            {isCurrentPlayerAI && (
+              <div style={{ color: '#FF9800', fontSize: '14px' }}>
+                🤖 AI正在思考...
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 游戏棋盘 */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
@@ -183,28 +226,29 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
         maxWidth: '300px',
         margin: '0 auto'
       }}>
-        {G.cells.map((cell, id) => (
+        {G.cells.map((cell, index) => (
           <button
-            key={id}
-            onClick={() => onClick(id)}
-            disabled={!isActive || cell !== null || ctx.gameover || isAIPlayer}
+            key={index}
+            onClick={() => moves.clickCell(index)}
+            disabled={!isActive || cell !== null || ctx.gameover}
             style={{
-              width: '100px',
-              height: '100px',
-              background: 'white',
-              border: '2px solid #333',
-              borderRadius: '10px',
+              width: '80px',
+              height: '80px',
               fontSize: '2rem',
               fontWeight: 'bold',
-              cursor: isActive && cell === null && !ctx.gameover && !isAIPlayer ? 'pointer' : 'not-allowed',
-              color: cell ? getPlayerColor(cell) : '#333',
-              opacity: isActive && cell === null && !ctx.gameover && !isAIPlayer ? 1 : 0.8
+              border: '2px solid #333',
+              backgroundColor: cell ? '#e0e0e0' : '#fff',
+              cursor: isActive && cell === null && !ctx.gameover ? 'pointer' : 'not-allowed',
+              color: cell === '0' ? '#f44336' : '#2196f3'
             }}
           >
-            {cell ? getPlayerSymbol(cell) : ''}
+            {cell === '0' ? 'O' : cell === '1' ? 'X' : ''}
           </button>
         ))}
       </div>
+
+      {/* AI组件 */}
+      {getBotComponent()}
     </div>
   );
 };

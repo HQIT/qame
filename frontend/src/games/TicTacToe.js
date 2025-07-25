@@ -16,8 +16,14 @@ import { INVALID_MOVE } from 'boardgame.io/core';
  */
 const TicTacToe = {
   name: 'tic-tac-toe',
-  setup: () => ({
+  setup: (ctx, setupData) => ({
     cells: Array(9).fill(null),
+    // 从setupData获取配置
+    aiConfig: setupData?.aiConfig || null,
+    roomSettings: setupData?.roomSettings || null,
+    // 游戏状态
+    gameOver: false,
+    winner: null
   }),
   turn: {
     minMoves: 1,
@@ -66,6 +72,19 @@ const TicTacToe = {
       console.log('move 执行成功');
       return { ...G, cells };
     },
+
+    /**
+     * 重新开始游戏
+     */
+    restartGame({ G }) {
+      console.log('重新开始游戏');
+      return {
+        ...G,
+        cells: Array(9).fill(null),
+        gameOver: false,
+        winner: null
+      };
+    }
   },
   
   endIf: ({ G, ctx }) => {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import GameSelector from './components/GameSelector';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
-import RoomList from './components/rooms/RoomList';
-import RoomDetail from './components/rooms/RoomDetail';
+import EnhancedLobby from './components/EnhancedLobby';
+import GameView from './components/GameView';
+
 import { api } from './utils/api';
 
 function App() {
@@ -11,10 +11,11 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(() => {
     // 从sessionStorage恢复视图状态
-    return sessionStorage.getItem('currentView') || 'games';
+    return sessionStorage.getItem('currentView') || 'lobby';
   });
   const [isAdmin, setIsAdmin] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [gameState, setGameState] = useState(null);
+
 
   // 检查用户是否已登录
   useEffect(() => {
@@ -65,21 +66,19 @@ function App() {
     sessionStorage.removeItem('adminActiveTab');
     setUser(null);
     setIsAdmin(false);
-    setCurrentView('games');
+    setCurrentView('lobby');
   };
 
   const handleViewChange = (newView) => {
     setCurrentView(newView);
     sessionStorage.setItem('currentView', newView);
-    setSelectedRoom(null); // 切换视图时清除选中的房间
+    setGameState(null); // 清除游戏状态
   };
 
-  const handleRoomSelect = (room) => {
-    setSelectedRoom(room);
-  };
-
-  const handleRoomBack = () => {
-    setSelectedRoom(null);
+  const handleGameStart = (matchID, playerID, playerName, gameName) => {
+    setGameState({ matchID, playerID, playerName, gameName });
+    setCurrentView('game');
+    sessionStorage.setItem('currentView', 'game');
   };
 
   if (loading) {
@@ -131,9 +130,9 @@ function App() {
             {/* 导航按钮 */}
             <div style={{ display: 'flex', gap: '10px', marginRight: '15px' }}>
               <button
-                onClick={() => handleViewChange('games')}
+                onClick={() => handleViewChange('lobby')}
                 style={{
-                  backgroundColor: currentView === 'games' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  backgroundColor: currentView === 'lobby' ? 'rgba(255,255,255,0.2)' : 'transparent',
                   border: '1px solid white',
                   color: 'white',
                   padding: '8px 16px',
@@ -145,24 +144,11 @@ function App() {
                 游戏大厅
               </button>
               
-              <button
-                onClick={() => handleViewChange('rooms')}
-                style={{
-                  backgroundColor: currentView === 'rooms' ? 'rgba(255,255,255,0.2)' : 'transparent',
-                  border: '1px solid white',
-                  color: 'white',
-                  padding: '8px 16px',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                房间系统
-              </button>
+
               
               {isAdmin && (
                 <button
-                  onClick={() => handleViewChange(currentView === 'admin' ? 'games' : 'admin')}
+                  onClick={() => handleViewChange(currentView === 'admin' ? 'lobby' : 'admin')}
                   style={{
                     backgroundColor: currentView === 'admin' ? 'rgba(255,255,255,0.2)' : 'transparent',
                     border: '1px solid white',
@@ -195,18 +181,19 @@ function App() {
           </div>
         </div>
 
-        {/* 游戏内容 */}
-        {currentView === 'admin' ? (
-          <AdminPanel />
-        ) : currentView === 'rooms' ? (
-          selectedRoom ? (
-            <RoomDetail roomId={selectedRoom.id} onBack={handleRoomBack} />
-          ) : (
-            <RoomList onRoomSelect={handleRoomSelect} />
-          )
-        ) : (
-          <GameSelector />
-        )}
+        {/* 主内容区域 */}
+        <div style={{ flex: 1, padding: '20px' }}>
+          {currentView === 'admin' && <AdminPanel />}
+          {currentView === 'lobby' && <EnhancedLobby onGameStart={handleGameStart} />}
+          {currentView === 'game' && gameState && (
+            <GameView 
+              matchID={gameState.matchID}
+              playerID={gameState.playerID}
+              playerName={gameState.playerName}
+              gameName={gameState.gameName}
+            />
+          )}
+        </div>
       </div>
     );
   }

@@ -42,40 +42,7 @@ CREATE TABLE IF NOT EXISTS ai_types (
   UNIQUE(provider_id, name)
 );
 
--- 创建房间表
-CREATE TABLE IF NOT EXISTS rooms (
-  id SERIAL PRIMARY KEY,
-  game_id VARCHAR(50) REFERENCES games(id),
-  name VARCHAR(100) NOT NULL,
-  max_players INTEGER NOT NULL,
-  status VARCHAR(20) DEFAULT 'waiting',
-  created_by INTEGER REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
--- 创建房间座位表
-CREATE TABLE IF NOT EXISTS room_seats (
-  id SERIAL PRIMARY KEY,
-  room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
-  seat_number INTEGER NOT NULL,
-  user_id INTEGER REFERENCES users(id),
-  ai_type_id INTEGER REFERENCES ai_types(id),
-  status VARCHAR(20) DEFAULT 'empty',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(room_id, seat_number)
-);
-
--- 创建游戏会话表
-CREATE TABLE IF NOT EXISTS game_sessions (
-  id SERIAL PRIMARY KEY,
-  room_id INTEGER REFERENCES rooms(id),
-  game_id VARCHAR(50) REFERENCES games(id),
-  game_state JSONB,
-  status VARCHAR(20) DEFAULT 'active',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 -- 插入初始数据
 INSERT INTO games (id, name, description, min_players, max_players) 
@@ -98,8 +65,5 @@ ON CONFLICT (provider_id, name) DO NOTHING;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_rooms_game_id ON rooms(game_id);
-CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
-CREATE INDEX IF NOT EXISTS idx_room_seats_room_id ON room_seats(room_id);
 CREATE INDEX IF NOT EXISTS idx_ai_types_provider_id ON ai_types(provider_id);
 CREATE INDEX IF NOT EXISTS idx_ai_types_status ON ai_types(status); 
