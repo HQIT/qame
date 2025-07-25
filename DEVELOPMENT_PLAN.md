@@ -221,8 +221,8 @@ CREATE TABLE game_sessions (
 - [x] 系统统计功能
 
 ### 第二阶段：AI系统
-- [ ] AI提供商管理
-- [ ] AI类型配置
+- [x] AI提供商管理
+- [x] AI类型配置
 - [ ] AI调用服务
 - [ ] AI性能监控
 - [ ] AI fallback机制
@@ -247,6 +247,7 @@ CREATE TABLE game_sessions (
 - [ ] 性能测试
 - [ ] 生产环境部署
 - [ ] 监控和日志
+- [ ] 日志系统重构（移除console.log，使用结构化日志）
 
 ## 文件结构
 

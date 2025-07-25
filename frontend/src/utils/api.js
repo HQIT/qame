@@ -48,5 +48,28 @@ export const api = {
   testAI: (aiTypeId) => apiCall('/api/ai/test', {
     method: 'POST',
     body: JSON.stringify({ aiTypeId })
-  })
+  }),
+
+  // AI管理相关
+  getAIProviders: () => apiCall('/api/admin/ai-providers'),
+  createAIProvider: (providerData) => apiCall('/api/admin/ai-providers', {
+    method: 'POST',
+    body: JSON.stringify(providerData)
+  }),
+  updateAIProvider: (providerId, providerData) => apiCall(`/api/admin/ai-providers/${providerId}`, {
+    method: 'PUT',
+    body: JSON.stringify(providerData)
+  }),
+  deleteAIProvider: (providerId) => apiCall(`/api/admin/ai-providers/${providerId}`, { method: 'DELETE' }),
+  
+  getAITypes: (gameId) => apiCall(`/api/admin/ai-types${gameId ? `?gameId=${gameId}` : ''}`),
+  createAIType: (typeData) => apiCall('/api/admin/ai-types', {
+    method: 'POST',
+    body: JSON.stringify(typeData)
+  }),
+  updateAIType: (typeId, typeData) => apiCall(`/api/admin/ai-types/${typeId}`, {
+    method: 'PUT',
+    body: JSON.stringify(typeData)
+  }),
+  deleteAIType: (typeId) => apiCall(`/api/admin/ai-types/${typeId}`, { method: 'DELETE' })
 }; 

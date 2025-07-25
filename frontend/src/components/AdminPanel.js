@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import UserManagement from './admin/UserManagement';
 import SystemStats from './admin/SystemStats';
+import AIProviderManagement from './admin/AIProviderManagement';
+import AITypeManagement from './admin/AITypeManagement';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState(() => {
@@ -66,12 +68,48 @@ const AdminPanel = () => {
           >
             👥 用户管理
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('ai-providers');
+              sessionStorage.setItem('adminActiveTab', 'ai-providers');
+            }}
+            style={{
+              padding: '15px 25px',
+              border: 'none',
+              backgroundColor: activeTab === 'ai-providers' ? '#3498db' : 'transparent',
+              color: activeTab === 'ai-providers' ? 'white' : '#666',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: activeTab === 'ai-providers' ? 'bold' : 'normal'
+            }}
+          >
+            🤖 AI提供商
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('ai-types');
+              sessionStorage.setItem('adminActiveTab', 'ai-types');
+            }}
+            style={{
+              padding: '15px 25px',
+              border: 'none',
+              backgroundColor: activeTab === 'ai-types' ? '#3498db' : 'transparent',
+              color: activeTab === 'ai-types' ? 'white' : '#666',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: activeTab === 'ai-types' ? 'bold' : 'normal'
+            }}
+          >
+            🎯 AI类型
+          </button>
         </div>
 
         {/* 内容区域 */}
         <div style={{ padding: '20px' }}>
           {activeTab === 'stats' && <SystemStats />}
           {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'ai-providers' && <AIProviderManagement />}
+          {activeTab === 'ai-types' && <AITypeManagement />}
         </div>
       </div>
     </div>

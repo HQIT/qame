@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS ai_types (
   config_schema JSONB DEFAULT '{}',
   supported_games TEXT[] DEFAULT '{}',
   status VARCHAR(20) DEFAULT 'active',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(provider_id, name)
 );
 
 -- 创建房间表
@@ -93,7 +94,7 @@ INSERT INTO ai_types (provider_id, name, description, endpoint, config_schema, s
 (1, 'LLM Bot', '基于大语言模型的AI', 'http://ai-provider:3001/api/llm-bot-v1/move', '{"model": "ecnu-max", "temperature": 0.7}', ARRAY['tic-tac-toe']),
 (2, 'Random AI', '随机移动的AI', 'http://random-ai:3002/api/random/move', '{}', ARRAY['tic-tac-toe']),
 (3, 'Minimax AI', '使用Minimax算法的AI', 'http://minimax-ai:3003/api/minimax/move', '{"depth": 5}', ARRAY['tic-tac-toe'])
-ON CONFLICT DO NOTHING;
+ON CONFLICT (provider_id, name) DO NOTHING;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

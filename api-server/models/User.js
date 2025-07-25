@@ -218,7 +218,22 @@ class User {
         FROM users
       `);
       
-      return result.rows[0];
+      // 返回嵌套结构以匹配前端期望
+      return {
+        users: {
+          total: parseInt(result.rows[0].total),
+          admin_count: parseInt(result.rows[0].admin_count),
+          user_count: parseInt(result.rows[0].user_count)
+        },
+        rooms: {
+          total: 0,
+          waiting: 0,
+          active: 0
+        },
+        online: {
+          total: 0
+        }
+      };
     } catch (error) {
       console.error('获取用户统计失败:', error);
       throw error;
