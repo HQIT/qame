@@ -76,5 +76,22 @@ export const api = {
   // 游戏相关
   getGames: () => apiCall('/api/games'),
 
-
+  // Match相关
+  getMatches: (filters = {}) => {
+    const params = new URLSearchParams(filters);
+    return apiCall(`/api/matches?${params}`);
+  },
+  createMatch: (matchData) => apiCall('/api/matches', {
+    method: 'POST',
+    body: JSON.stringify(matchData)
+  }),
+  getMatch: (matchId) => apiCall(`/api/matches/${matchId}`),
+  deleteMatch: (matchId) => apiCall(`/api/matches/${matchId}`, { method: 'DELETE' }),
+  addPlayerToMatch: (matchId, playerData) => apiCall(`/api/matches/${matchId}/players`, {
+    method: 'POST',
+    body: JSON.stringify(playerData)
+  }),
+  removePlayerFromMatch: (matchId, playerId) => apiCall(`/api/matches/${matchId}/players/${playerId}`, { method: 'DELETE' }),
+  startMatch: (matchId) => apiCall(`/api/matches/${matchId}/start`, { method: 'POST' }),
+  cancelMatch: (matchId) => apiCall(`/api/matches/${matchId}/cancel`, { method: 'POST' })
 }; 

@@ -35,7 +35,9 @@ async function runMigrations() {
       '003_add_refresh_tokens.sql',
       '004_add_user_salt.sql',
       '005_update_existing_users_salt.sql',
-      '006_remove_user_salt.sql'
+      '006_remove_user_salt.sql',
+      '007_add_match_tables.sql',
+      '008_add_bgio_match_id.sql'
     ];
     
     for (const migrationFile of migrationFiles) {

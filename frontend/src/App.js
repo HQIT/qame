@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
-import EnhancedLobby from './components/EnhancedLobby';
+import NewEnhancedLobby from './components/NewEnhancedLobby';
 import GameView from './components/GameView';
 
 import { api } from './utils/api';
@@ -184,7 +184,7 @@ function App() {
         {/* 主内容区域 */}
         <div style={{ flex: 1, padding: '20px' }}>
           {currentView === 'admin' && <AdminPanel />}
-          {currentView === 'lobby' && <EnhancedLobby onGameStart={handleGameStart} />}
+          {currentView === 'lobby' && <NewEnhancedLobby onGameStart={handleGameStart} />}
           {currentView === 'game' && gameState && (
             <GameView 
               matchID={gameState.matchID}
