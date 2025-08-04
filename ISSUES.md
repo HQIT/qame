@@ -2,39 +2,61 @@
 
 ## 当前问题
 
-### 2024-12-20 - 游戏大厅和Match系统问题
+### 2024-08-04 - 游戏流程和Match管理进阶问题
 **状态：** 待解决
 **优先级：** 高
 
 **问题描述：**
-1. **玩家列表显示问题** - 显示"玩家列表: admin, 未命名"，应该正确显示玩家名称，未命名应该是缺一个玩家的意思
-2. **游戏开始逻辑错误** - 进入游戏后直接开始，应该等待所有玩家确认后才开始
-3. **AI玩家确认机制缺失** - AI玩家进入后应该自动确认开始，但人类玩家需要手动确认
-4. **单人游戏问题** - 只有一个人（admin）也能开始游戏，当前井字棋游戏来说是不对的；且输赢判定错误
-5. **游戏内返回大厅跳转错误** - 跳转路径不正确
-6. **缺少退出Match功能** - 没有退出Match的选项
-7. **已满员Match清理问题** - 显示"玩家列表: 未命名, 未命名"的满员Match无法清理
+1. **过早进入游戏问题** - 玩家未到齐就能进入游戏对战界面（井字棋），缺乏等待房间机制
+2. **返回大厅空白页面** - 从游戏界面点击返回游戏大厅时显示空白页面（有页头但无内容）
+3. **重新加入Match失败** - 玩家离开Match后无法重新加入，报错"Player 0 not available" (409错误)
+4. **游戏开始时机错误** - 缺乏人数检查，单人也能开始游戏
 
 **影响范围：**
-- 游戏大厅用户体验
-- 多人游戏逻辑
-- AI玩家集成
-- 游戏状态管理
+- 游戏流程体验
+- Match状态管理
+- 玩家座位分配逻辑
+- 多人游戏协调
 
 **相关文件：**
-- `frontend/src/components/EnhancedLobby.js` - 游戏大厅组件
+- `frontend/src/components/NewEnhancedLobby.js` - 新游戏大厅组件
 - `frontend/src/components/GameView.js` - 游戏界面组件
-- `frontend/src/games/TicTacToe.js` - 井字棋游戏逻辑
-- `frontend/src/games/TicTacToeBoard.js` - 井字棋游戏界面
+- `api-server/routes/matches.js` - Match管理API
+- `api-server/models/MatchPlayer.js` - 玩家座位管理
 
 **解决方案思路：**
-1. 修复玩家名称显示逻辑
-2. 实现游戏开始确认机制
-3. 添加AI玩家自动确认功能
-4. 修复单人游戏逻辑和输赢判定
-5. 修复游戏内导航
-6. 添加退出Match功能
-7. 实现Match清理机制
+1. 实现等待房间机制，确保最小玩家数要求
+2. 修复游戏界面路由导航问题
+3. 完善玩家离开和重新加入的座位管理逻辑
+4. 添加游戏开始前的人数验证
+
+---
+
+## 已解决的问题
+
+### 2024-08-04 - Match管理系统重构 ✅
+**状态：** 已解决
+**解决方案：** 
+1. 实现了完整的Match资源管理API（符合REST规范）
+2. 添加了Toast消息提示系统替代原生弹窗
+3. 实现了智能座位重用机制解决数据库约束冲突
+4. 修复了boardgame.io Match ID不一致问题
+5. 添加了Match生命周期管理功能
+
+**相关文件：**
+- `api-server/routes/matches.js` - 新的Match API
+- `api-server/models/Match.js` - Match模型
+- `api-server/models/MatchPlayer.js` - 玩家模型
+- `frontend/src/components/MessageToast.js` - Toast组件
+- `frontend/src/components/NewEnhancedLobby.js` - 重构的大厅组件
+
+### 2024-08-04 - 原游戏大厅系统问题 ✅
+**状态：** 已解决
+**解决方案：** 
+1. 修复了"未命名"玩家显示问题
+2. 重新设计了Match创建流程（不自动加入创建者）
+3. 实现了Match管理功能（删除、离开、清理）
+4. 添加了完整的权限控制逻辑
 
 ---
 
