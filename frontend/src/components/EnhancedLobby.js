@@ -457,23 +457,6 @@ const EnhancedLobby = ({ onGameStart }) => {
               </div>
             )}
           </div>
-
-          {/* 使用说明 */}
-          <div style={{ 
-            backgroundColor: '#e7f3ff', 
-            padding: '15px', 
-            borderRadius: '6px',
-            border: '1px solid #b3d9ff'
-          }}>
-            <h4 style={{ marginBottom: '10px', color: '#0056b3' }}>💡 使用说明</h4>
-            <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
-              <p>• 选择游戏类型（目前支持井字棋）</p>
-              <p>• 点击"创建新Match"创建游戏房间</p>
-              <p>• 或加入现有的match进行游戏</p>
-              <p>• 可选择启用AI玩家进行人机对战</p>
-              <p>• 游戏结束后可重新开始</p>
-            </div>
-          </div>
         </div>
 
         {/* 右侧Lobby区域 */}

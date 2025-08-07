@@ -122,14 +122,14 @@ class AIType {
   // 删除AI类型
   static async delete(id) {
     try {
-      // 检查是否被房间座位引用
-      const roomSeatsResult = await query(
-        'SELECT COUNT(*) as count FROM room_seats WHERE ai_type_id = $1',
+      // 检查是否被match_players引用
+      const matchPlayersResult = await query(
+        'SELECT COUNT(*) as count FROM match_players WHERE ai_type_id = $1',
         [id]
       );
       
-      if (parseInt(roomSeatsResult.rows[0].count) > 0) {
-        throw new Error('该AI类型正在被房间使用，请先移除房间中的AI玩家');
+      if (parseInt(matchPlayersResult.rows[0].count) > 0) {
+        throw new Error('该AI类型正在被游戏使用，请先移除游戏中的AI玩家');
       }
 
       const result = await query(

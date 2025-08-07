@@ -8,7 +8,9 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "boardgame.io": "^0.50.2"
+    "boardgame.io": "^0.50.2",
+    "undici": "^5.28.4",
+    "pg": "^8.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

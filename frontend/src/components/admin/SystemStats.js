@@ -68,23 +68,25 @@ const SystemStats = () => {
           </div>
         </div>
 
-        {/* 房间统计 */}
+        {/* 比赛统计 */}
         <div style={{
           backgroundColor: '#f8f9fa',
           padding: '20px',
           borderRadius: '8px',
           border: '1px solid #e9ecef'
         }}>
-          <h3 style={{ margin: '0 0 15px 0', color: '#495057' }}>🏠 房间统计</h3>
+          <h3 style={{ margin: '0 0 15px 0', color: '#495057' }}>🎮 比赛统计</h3>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
-            {stats.rooms?.total || 0}
+            {stats.matches?.total || 0}
           </div>
           <div style={{ fontSize: '14px', color: '#6c757d', marginTop: '5px' }}>
-            总房间数
+            总比赛数
           </div>
           <div style={{ marginTop: '10px', fontSize: '14px' }}>
-            <div style={{ color: '#ffc107' }}>等待中: {stats.rooms?.waiting || 0}</div>
-            <div style={{ color: '#28a745' }}>进行中: {stats.rooms?.active || 0}</div>
+            <div style={{ color: '#ffc107' }}>等待中: {stats.matches?.waiting || 0}</div>
+            <div style={{ color: '#17a2b8' }}>准备中: {stats.matches?.ready || 0}</div>
+            <div style={{ color: '#28a745' }}>进行中: {stats.matches?.playing || 0}</div>
+            <div style={{ color: '#6c757d' }}>已完成: {stats.matches?.finished || 0}</div>
           </div>
         </div>
 
@@ -101,6 +103,10 @@ const SystemStats = () => {
           </div>
           <div style={{ fontSize: '14px', color: '#6c757d', marginTop: '5px' }}>
             当前在线
+          </div>
+          <div style={{ marginTop: '10px', fontSize: '14px' }}>
+            <div style={{ color: '#007bff' }}>👤 人类用户: {stats.online?.human || 0}</div>
+            <div style={{ color: '#28a745' }}>🤖 AI客户端: {stats.online?.ai || 0}</div>
           </div>
         </div>
       </div>

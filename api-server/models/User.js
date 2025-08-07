@@ -210,32 +210,78 @@ class User {
   // 获取用户统计信息
   static async getStats() {
     try {
-      const result = await query(`
+      // 用户统计
+      const userResult = await query(`
         SELECT 
           COUNT(*) as total,
           COUNT(CASE WHEN role = 'admin' THEN 1 END) as admin_count,
           COUNT(CASE WHEN role = 'user' THEN 1 END) as user_count
         FROM users
       `);
+
+      // 比赛统计
+      const matchResult = await query(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'waiting' THEN 1 END) as waiting,
+          COUNT(CASE WHEN status = 'ready' THEN 1 END) as ready,
+          COUNT(CASE WHEN status = 'playing' THEN 1 END) as playing,
+          COUNT(CASE WHEN status = 'finished' THEN 1 END) as finished,
+          COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled
+        FROM matches
+      `);
+
+      // 在线用户统计
+      let onlineResult;
+      try {
+        onlineResult = await query(`
+          SELECT 
+            COUNT(DISTINCT u.id) as total,
+            COUNT(DISTINCT CASE WHEN u.player_type = 'human' THEN u.id END) as human,
+            COUNT(DISTINCT CASE WHEN u.player_type = 'ai' THEN u.id END) as ai
+          FROM (
+            SELECT id::text, 'human' as player_type FROM user_online_status 
+            WHERE last_heartbeat > NOW() - INTERVAL '2 minutes'
+            UNION ALL
+            SELECT id::text, 'ai' as player_type FROM ai_clients 
+            WHERE status = 'connected'
+          ) u
+        `);
+      } catch (onlineError) {
+        console.warn('AI clients table may not exist, falling back to human users only:', onlineError.message);
+        // 如果ai_clients表不存在，只查询人类用户
+        onlineResult = await query(`
+          SELECT 
+            COUNT(*) as total,
+            COUNT(*) as human,
+            0 as ai
+          FROM user_online_status 
+          WHERE last_heartbeat > NOW() - INTERVAL '2 minutes'
+        `);
+      }
       
-      // 返回嵌套结构以匹配前端期望
       return {
         users: {
-          total: parseInt(result.rows[0].total),
-          admin_count: parseInt(result.rows[0].admin_count),
-          user_count: parseInt(result.rows[0].user_count)
+          total: parseInt(userResult.rows[0].total),
+          admin_count: parseInt(userResult.rows[0].admin_count),
+          user_count: parseInt(userResult.rows[0].user_count)
         },
-        rooms: {
-          total: 0,
-          waiting: 0,
-          active: 0
+        matches: {
+          total: parseInt(matchResult.rows[0].total),
+          waiting: parseInt(matchResult.rows[0].waiting),
+          ready: parseInt(matchResult.rows[0].ready),
+          playing: parseInt(matchResult.rows[0].playing),
+          finished: parseInt(matchResult.rows[0].finished),
+          cancelled: parseInt(matchResult.rows[0].cancelled)
         },
         online: {
-          total: 0
+          total: parseInt(onlineResult.rows[0].total || 0),
+          human: parseInt(onlineResult.rows[0].human || 0),
+          ai: parseInt(onlineResult.rows[0].ai || 0)
         }
       };
     } catch (error) {
-      console.error('获取用户统计失败:', error);
+      console.error('获取统计失败:', error);
       throw error;
     }
   }

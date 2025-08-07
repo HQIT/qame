@@ -127,45 +127,132 @@ class MatchPlayer {
     return result.rows.length === 0;
   }
 
-  // 获取用户在match中的玩家信息
+  // 获取用户在match中的玩家信息（包括已离开的玩家，按加入时间倒序）
   static async findByUserAndMatch(userId, matchId) {
     const result = await query(`
       SELECT * FROM match_players 
-      WHERE user_id = $1 AND match_id = $2 AND status != 'left'
+      WHERE user_id = $1 AND match_id = $2
+      ORDER BY joined_at DESC
+      LIMIT 1
     `, [userId, matchId]);
 
     return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
   }
 
-  // 检查用户是否已在match中
+  // 检查用户是否在match中
   static async isUserInMatch(userId, matchId) {
-    const result = await query(`
-      SELECT 1 FROM match_players 
-      WHERE user_id = $1 AND match_id = $2 AND status != 'left'
-    `, [userId, matchId]);
-
+    const result = await query(
+      'SELECT 1 FROM match_players WHERE user_id = $1 AND match_id = $2 AND status != $3',
+      [userId, matchId, 'left']
+    );
     return result.rows.length > 0;
   }
 
-  // 获取match中的下一个可用座位
+  // 获取下一个可用座位
   static async getNextAvailableSeat(matchId) {
-    // 获取match的最大玩家数
-    const matchResult = await query('SELECT max_players FROM matches WHERE id = $1', [matchId]);
-    if (matchResult.rows.length === 0) {
-      throw new Error('Match not found');
-    }
+    const result = await query(`
+      SELECT COALESCE(MAX(seat_index), -1) + 1 as next_seat
+      FROM match_players 
+      WHERE match_id = $1 AND status != 'left'
+    `, [matchId]);
+    return parseInt(result.rows[0].next_seat);
+  }
 
-    const maxPlayers = matchResult.rows[0].max_players;
+  // 检查AI类型是否存在
+  static async checkAITypeExists(aiTypeId) {
+    const result = await query('SELECT * FROM ai_types WHERE id = $1 AND status = $2', [aiTypeId, 'active']);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
 
-    // 找到第一个可用的座位
-    for (let seatIndex = 0; seatIndex < maxPlayers; seatIndex++) {
-      const isAvailable = await this.isSeatAvailable(matchId, seatIndex);
-      if (isAvailable) {
-        return seatIndex;
-      }
-    }
+  // 检查AI玩家是否已存在
+  static async checkAIExists(matchId, aiTypeId) {
+    const result = await query(`
+      SELECT * FROM match_players 
+      WHERE match_id = $1 AND ai_type_id = $2 AND status != 'left'
+    `, [matchId, aiTypeId]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
 
-    return -1; // 没有可用座位
+  // 获取用户在match中的凭证
+  static async getCredentialsByUser(matchId, userId) {
+    const result = await query(
+      'SELECT player_credentials, seat_index FROM match_players WHERE match_id = $1 AND user_id = $2',
+      [matchId, userId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  // 通过bgio_match_id获取用户凭证
+  static async getCredentialsByBgioMatchId(bgioMatchId, userId) {
+    const result = await query(`
+      SELECT mp.player_credentials, mp.seat_index 
+      FROM match_players mp 
+      JOIN matches m ON mp.match_id = m.id 
+      WHERE m.bgio_match_id = $1 AND mp.user_id = $2
+    `, [bgioMatchId, userId]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  // 根据用户ID和match ID查找玩家
+  static async findByUserIdAndMatchId(userId, matchId) {
+    const result = await query(
+      'SELECT player_credentials, seat_index FROM match_players WHERE match_id = $1 AND user_id = $2',
+      [matchId, userId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  // 通过bgio_match_id和用户ID查找玩家
+  static async findByBgioMatchIdAndUserId(bgioMatchId, userId) {
+    const result = await query(`
+      SELECT mp.player_credentials, mp.seat_index 
+      FROM match_players mp 
+      JOIN matches m ON mp.match_id = m.id 
+      WHERE m.bgio_match_id = $1 AND mp.user_id = $2
+    `, [bgioMatchId, userId]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  // 查找用户的活跃matches
+  static async findActiveMatchesByUserId(userId) {
+    const result = await query(`
+      SELECT m.id as match_id, m.game_id, mp.seat_index
+      FROM match_players mp
+      JOIN matches m ON mp.match_id = m.id
+      WHERE mp.user_id = $1 
+      AND mp.status = 'joined' 
+      AND m.status IN ('waiting', 'playing')
+    `, [userId]);
+    return result.rows;
+  }
+
+  // 查找已存在的AI玩家
+  static async findExistingAIPlayer(matchId, aiTypeId) {
+    const result = await query(`
+      SELECT * FROM match_players 
+      WHERE match_id = $1 AND ai_type_id = $2 AND status = 'left'
+      ORDER BY left_at DESC 
+      LIMIT 1
+    `, [matchId, aiTypeId]);
+    return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
+  }
+
+  // 更新玩家凭证
+  static async updatePlayerCredentials(matchId, userId, playerCredentials) {
+    const result = await query(
+      'UPDATE match_players SET player_credentials = $1 WHERE match_id = $2 AND user_id = $3 RETURNING *',
+      [playerCredentials, matchId, userId]
+    );
+    return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
+  }
+
+  // 查找match的第一个玩家
+  static async findFirstPlayerByMatchId(matchId) {
+    const result = await query(
+      'SELECT seat_index, player_name, player_type FROM match_players WHERE match_id = $1 ORDER BY seat_index LIMIT 1',
+      [matchId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
   }
 
   // 更新玩家状态

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AIBot from '../components/AIBot';
 import LLMBot from '../components/LLMBot';
 
@@ -35,21 +35,35 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
     aiConfig: G.aiConfig
   });
 
-  // 优先使用游戏状态中的AI配置，兼容旧版本的enableAI参数
-  const isAIPlayer = (G.aiConfig?.enabled || enableAI) && playerID === '1';
-  const currentAiType = G.aiConfig?.aiTypeName || aiType;
+  // 基于游戏状态中的AI玩家信息判断当前玩家是否为AI
+  const isAIPlayer = G.aiPlayers && G.aiPlayers.some(ai => ai.seat_index === parseInt(playerID));
+  const currentAiType = isAIPlayer ? 
+    (G.aiPlayers.find(ai => ai.seat_index === parseInt(playerID))?.ai_type_name || 'unknown') : 
+    'none';
   const isCurrentPlayerAI = isAIPlayer && isActive;
+  
+  // 调试信息
+  console.log('[Board] AI配置检查:', {
+    playerID,
+    isAIPlayer,
+    isCurrentPlayerAI,
+    aiPlayers: G.aiPlayers,
+    currentAiType,
+    isActive
+  });
+  
+  // 前端不执行AI逻辑，只被动接收状态变化
+  // AI逻辑完全由后端AI Manager处理
   
   // 根据AI类型选择对应的Bot组件
   const getBotComponent = () => {
-    console.log('🎮 选择Bot组件:', {
-      enableAI,
+    console.log('�� 选择Bot组件:', {
       isAIPlayer,
-      aiType,
-      shouldShowBot: enableAI && isAIPlayer
+      currentAiType,
+      shouldShowBot: isAIPlayer
     });
     
-    if (!enableAI || !isAIPlayer) {
+    if (!isAIPlayer) {
       console.log('🎮 不显示Bot组件');
       return null;
     }

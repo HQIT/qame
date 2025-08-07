@@ -14,7 +14,11 @@ function App() {
     return sessionStorage.getItem('currentView') || 'lobby';
   });
   const [isAdmin, setIsAdmin] = useState(false);
-  const [gameState, setGameState] = useState(null);
+  const [gameState, setGameState] = useState(() => {
+    // 从sessionStorage恢复游戏状态
+    const savedGameState = sessionStorage.getItem('gameState');
+    return savedGameState ? JSON.parse(savedGameState) : null;
+  });
 
 
   // 检查用户是否已登录
@@ -30,6 +34,14 @@ function App() {
           setIsAdmin(data.data.role === 'admin');
           // 保存用户信息到sessionStorage
           sessionStorage.setItem('user', JSON.stringify(data.data));
+          
+          // 用户认证成功后立即发送心跳，标记为在线
+          try {
+            await api.sendHeartbeat();
+            console.log('✅ 用户上线心跳发送成功');
+          } catch (error) {
+            console.warn('⚠️ 发送上线心跳失败:', error);
+          }
         } else {
           // token无效，清除本地存储
           sessionStorage.removeItem('user');
@@ -49,9 +61,17 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLogin = (userData) => {
+  const handleLogin = async (userData) => {
     setUser(userData);
     setIsAdmin(userData.role === 'admin');
+    
+    // 用户登录后立即发送心跳，标记为在线
+    try {
+      await api.sendHeartbeat();
+      console.log('✅ 用户登录心跳发送成功');
+    } catch (error) {
+      console.warn('⚠️ 发送登录心跳失败:', error);
+    }
   };
 
   const handleLogout = async () => {
@@ -63,22 +83,36 @@ function App() {
     
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('currentView');
+    sessionStorage.removeItem('gameState');
     sessionStorage.removeItem('adminActiveTab');
     setUser(null);
     setIsAdmin(false);
     setCurrentView('lobby');
+    setGameState(null);
   };
 
   const handleViewChange = (newView) => {
     setCurrentView(newView);
     sessionStorage.setItem('currentView', newView);
-    setGameState(null); // 清除游戏状态
+    // 只有在切换到非游戏视图且不是从游戏返回大厅时才清除游戏状态
+    if (newView !== 'game' && newView !== 'lobby') {
+      setGameState(null);
+      sessionStorage.removeItem('gameState');
+    }
   };
 
   const handleGameStart = (matchID, playerID, playerName, gameName) => {
-    setGameState({ matchID, playerID, playerName, gameName });
+    const newGameState = { matchID, playerID, playerName, gameName };
+    setGameState(newGameState);
+    sessionStorage.setItem('gameState', JSON.stringify(newGameState));
     setCurrentView('game');
     sessionStorage.setItem('currentView', 'game');
+  };
+
+  const handleReturnToLobby = () => {
+    setCurrentView('lobby');
+    sessionStorage.setItem('currentView', 'lobby');
+    // 不清除gameState，保持游戏状态以便用户可以重新进入
   };
 
   if (loading) {
@@ -191,6 +225,7 @@ function App() {
               playerID={gameState.playerID}
               playerName={gameState.playerName}
               gameName={gameState.gameName}
+              onReturnToLobby={handleReturnToLobby}
             />
           )}
         </div>

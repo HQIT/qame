@@ -28,22 +28,40 @@ async function runMigrations() {
     const fs = require('fs');
     const path = require('path');
     
-    // 迁移文件列表（按顺序执行）
-    const migrationFiles = [
-      '001_initial_schema.sql',
-      '002_add_user_role.sql',
-      '003_add_refresh_tokens.sql',
-      '004_add_user_salt.sql',
-      '005_update_existing_users_salt.sql',
-      '006_remove_user_salt.sql',
-      '007_add_match_tables.sql',
-      '008_add_bgio_match_id.sql'
-    ];
+    // 迁移文件目录
+    const migrationsDir = path.join(__dirname, '../migrations');
+    
+    // 自动发现所有迁移文件并按数字前缀排序
+    const allFiles = fs.readdirSync(migrationsDir);
+    const migrationFiles = allFiles
+      .filter(file => file.endsWith('.sql'))
+      .filter(file => /^\d{3}_/.test(file)) // 必须以3位数字开头
+      .sort((a, b) => {
+        // 提取文件名前缀数字进行排序
+        const numA = parseInt(a.substring(0, 3));
+        const numB = parseInt(b.substring(0, 3));
+        return numA - numB;
+      });
+    
+    console.log(`📁 发现 ${migrationFiles.length} 个迁移文件:`, migrationFiles);
     
     for (const migrationFile of migrationFiles) {
       console.log(`🔄 执行迁移: ${migrationFile}`);
-      const migrationPath = path.join(__dirname, '../migrations', migrationFile);
+      const migrationPath = path.join(migrationsDir, migrationFile);
+      
+      // 检查文件是否存在
+      if (!fs.existsSync(migrationPath)) {
+        console.warn(`⚠️  迁移文件不存在: ${migrationPath}`);
+        continue;
+      }
+      
       const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      
+      // 跳过空文件
+      if (!migrationSQL.trim()) {
+        console.log(`⏭️  跳过空迁移文件: ${migrationFile}`);
+        continue;
+      }
       
       // 执行迁移
       await pool.query(migrationSQL);
@@ -53,6 +71,7 @@ async function runMigrations() {
     console.log('✅ 所有数据库迁移执行成功');
   } catch (error) {
     console.error('❌ 数据库迁移失败:', error);
+    console.error('错误详情:', error.message);
     throw error;
   }
 }

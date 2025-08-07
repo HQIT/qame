@@ -127,3 +127,5 @@ nginx/ssl/
 .vscode/tasks.json
 
 generate-ssl.sh
+cookies.txt
+test-*.js

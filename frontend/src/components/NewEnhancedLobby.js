@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useToast } from './MessageToast';
+import OnlinePlayers from './OnlinePlayers';
 
 const NewEnhancedLobby = ({ onGameStart }) => {
   // Toast消息系统
@@ -26,6 +27,36 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   useEffect(() => {
     fetchData();
   }, [selectedGame]);
+
+  // 检查playing状态的match是否已结束
+  const checkPlayingMatches = async (playingMatches) => {
+    try {
+      let hasFinishedGames = false;
+      for (const match of playingMatches) {
+        try {
+          const response = await api.checkGameStatus(match.id);
+          if (response.code === 200 && response.data?.status === 'finished') {
+            console.log(`Match ${match.id} 已结束:`, response.data.gameResult);
+            info(`游戏 ${match.id.substring(0, 8)}... 已结束！`);
+            hasFinishedGames = true;
+          }
+        } catch (error) {
+          // 单个match检查失败不影响其他的
+          console.error(`检查match ${match.id} 状态失败:`, error);
+        }
+      }
+      
+      // 如果有游戏结束，延迟1秒后重新获取数据以显示最新状态
+      if (hasFinishedGames) {
+        setTimeout(() => {
+          console.log('检测到游戏结束，重新获取match列表');
+          fetchData();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('检查playing matches失败:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -54,6 +85,12 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
       if (matchesResponse.code === 200) {
         setMatches(matchesResponse.data);
+        
+        // 自动检查所有playing状态的match，看是否需要更新为finished状态
+        const playingMatches = matchesResponse.data.filter(match => match.status === 'playing');
+        if (playingMatches.length > 0) {
+          checkPlayingMatches(playingMatches);
+        }
       }
     } catch (error) {
       console.error('获取数据失败:', error);
@@ -102,10 +139,9 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
       if (response.code === 200) {
         console.log('加入成功:', response.data);
-        success('成功加入游戏！');
-        // 进入游戏，使用boardgame.io的真实match ID
-        const bgioMatchId = response.data.bgioMatchId || matchId;
-        onGameStart(bgioMatchId, response.data.seatIndex.toString(), currentUser?.username, selectedGame);
+        success('成功加入游戏！请等待其他玩家加入或创建者开始游戏');
+        // 刷新match列表，显示最新状态
+        await fetchData();
       } else {
         error(`加入失败: ${response.message}`);
       }
@@ -183,11 +219,36 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   // 开始Match
   const startMatch = async (matchId) => {
     try {
+      // 获取当前match信息进行验证
+      const match = matches.find(m => m.id === matchId);
+      if (!match) {
+        error('找不到该Match');
+        return;
+      }
+
+      // 验证玩家数量
+      if (match.currentPlayerCount < match.min_players) {
+        error(`玩家数量不足！当前 ${match.currentPlayerCount} 人，至少需要 ${match.min_players} 人才能开始游戏`);
+        return;
+      }
+
+      // 验证match状态
+      if (match.status !== 'waiting') {
+        error('只有等待中的Match才能开始游戏');
+        return;
+      }
+
+      // 验证是否是创建者
+      if (!isCreator(match)) {
+        error('只有创建者可以开始游戏');
+        return;
+      }
+
       const response = await api.startMatch(matchId);
 
       if (response.code === 200) {
         console.log('游戏开始');
-        success('游戏开始！');
+        success('游戏开始！所有玩家现在可以进入游戏了');
         // 刷新match列表
         await fetchData();
       } else {
@@ -316,32 +377,37 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                 <>
                   <button
                     onClick={() => {
-                      // 使用boardgame.io的真实match ID，如果没有则使用我们的ID
-                      const bgioMatchId = match.bgio_match_id || match.id;
-                      onGameStart(bgioMatchId, playerInMatch.seatIndex.toString(), currentUser?.username, selectedGame);
+                      if (match.status === 'playing') {
+                        // 使用boardgame.io的真实match ID，如果没有则使用我们的ID
+                        const bgioMatchId = match.bgio_match_id || match.id;
+                        onGameStart(bgioMatchId, playerInMatch.seatIndex.toString(), currentUser?.username, selectedGame);
+                      } else {
+                        warning('游戏尚未开始，请等待创建者开始游戏或等待更多玩家加入');
+                      }
                     }}
+                    disabled={match.status !== 'playing'}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: '#007bff',
+                      backgroundColor: match.status === 'playing' ? '#007bff' : '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: match.status === 'playing' ? 'pointer' : 'not-allowed',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {match.status === 'playing' ? '进入游戏' : 
+                     match.status === 'waiting' ? '等待开始' : '游戏结束'}
+                  </button>
+                  <button
+                    onClick={() => leaveMatch(match.id, playerInMatch.id)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#dc3545',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    进入游戏
-                  </button>
-                  <button
-                    onClick={() => leaveMatch(match.id, playerInMatch.id)}
-                    disabled={match.status === 'playing'}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: match.status === 'playing' ? '#6c757d' : '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: match.status === 'playing' ? 'not-allowed' : 'pointer',
                       fontSize: '12px'
                     }}
                   >
@@ -401,22 +467,20 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                   </button>
                 )}
                 {canAddAI && renderAISelector(match.id)}
-                {match.status !== 'playing' && (
-                  <button
-                    onClick={() => deleteMatch(match.id)}
-                    style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '11px'
-                    }}
-                  >
-                    删除
-                  </button>
-                )}
+                <button
+                  onClick={() => deleteMatch(match.id)}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '11px'
+                  }}
+                >
+                  删除
+                </button>
               </div>
             )}
           </div>
@@ -483,7 +547,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>🎮 游戏大厅</h1>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: '20px' }}>
         {/* 左侧配置面板 */}
         <div style={{ 
           backgroundColor: '#f8f9fa', 
@@ -551,19 +615,19 @@ const NewEnhancedLobby = ({ onGameStart }) => {
             </button>
           </div>
 
-          {/* 使用说明 */}
+          {/* 游戏说明 */}
           <div style={{ 
             backgroundColor: '#e7f3ff', 
             padding: '15px', 
             borderRadius: '6px',
             border: '1px solid #b3d9ff'
           }}>
-            <h4 style={{ marginBottom: '10px', color: '#0056b3' }}>💡 使用说明</h4>
+            <h4 style={{ marginBottom: '10px', color: '#0056b3' }}>🎮 游戏大厅</h4>
             <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
-              <p>• 创建Match后不会自动加入</p>
-              <p>• 可以选择自己加入或添加AI玩家</p>
-              <p>• 创建者可以管理Match和AI玩家</p>
-              <p>• 游戏未开始前可以随时离开</p>
+              <p>• 选择游戏类型，创建或加入游戏房间</p>
+              <p>• 支持人人对战和人机对战模式</p>
+              <p>• AI玩家会显示在右侧在线列表中</p>
+              <p>• 实时查看游戏状态和在线玩家</p>
               <p>• 人数满足要求后可开始游戏</p>
             </div>
           </div>
@@ -605,6 +669,9 @@ const NewEnhancedLobby = ({ onGameStart }) => {
             </div>
           )}
         </div>
+
+        {/* 右侧在线玩家面板 */}
+        <OnlinePlayers currentUser={currentUser} />
       </div>
       <ToastContainer />
     </div>

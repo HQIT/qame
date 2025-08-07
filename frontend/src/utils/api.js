@@ -18,6 +18,17 @@ export const apiCall = async (url, options = {}) => {
 
 // 常用的API调用方法
 export const api = {
+  // 通用HTTP方法
+  get: (url) => apiCall(url),
+  post: (url, data) => apiCall(url, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  put: (url, data) => apiCall(url, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  delete: (url) => apiCall(url, { method: 'DELETE' }),
   // 认证相关
   verify: () => apiCall('/api/auth/verify'),
   login: (credentials) => apiCall('/api/auth/login', {
@@ -62,7 +73,7 @@ export const api = {
   }),
   deleteAIProvider: (providerId) => apiCall(`/api/admin/ai-providers/${providerId}`, { method: 'DELETE' }),
   
-  getAITypes: (gameId) => apiCall(`/api/admin/ai-types${gameId ? `?gameId=${gameId}` : ''}`),
+  getAdminAITypes: (gameId) => apiCall(`/api/admin/ai-types${gameId ? `?gameId=${gameId}` : ''}`),
   createAIType: (typeData) => apiCall('/api/admin/ai-types', {
     method: 'POST',
     body: JSON.stringify(typeData)
@@ -93,5 +104,13 @@ export const api = {
   }),
   removePlayerFromMatch: (matchId, playerId) => apiCall(`/api/matches/${matchId}/players/${playerId}`, { method: 'DELETE' }),
   startMatch: (matchId) => apiCall(`/api/matches/${matchId}/start`, { method: 'POST' }),
-  cancelMatch: (matchId) => apiCall(`/api/matches/${matchId}/cancel`, { method: 'POST' })
+  cancelMatch: (matchId) => apiCall(`/api/matches/${matchId}/cancel`, { method: 'POST' }),
+  checkGameStatus: (matchId) => apiCall(`/api/matches/${matchId}/check-game-status`, { method: 'POST' }),
+  getCredentials: (matchId) => apiCall(`/api/matches/${matchId}/credentials`),
+
+  // 在线用户相关
+  sendHeartbeat: () => apiCall('/api/online/heartbeat', { method: 'POST' }),
+  getOnlineUsers: () => apiCall('/api/online/users'),
+  getOnlineStats: () => apiCall('/api/online/stats'),
+  setOffline: () => apiCall('/api/online/offline', { method: 'POST' })
 }; 

@@ -41,19 +41,19 @@ class Match {
     let paramIndex = 1;
 
     if (filters.gameId) {
-      whereClause += ` AND game_id = $${paramIndex}`;
+      whereClause += ` AND m.game_id = $${paramIndex}`;
       params.push(filters.gameId);
       paramIndex++;
     }
 
     if (filters.status) {
-      whereClause += ` AND status = $${paramIndex}`;
+      whereClause += ` AND m.status = $${paramIndex}`;
       params.push(filters.status);
       paramIndex++;
     }
 
     if (filters.creatorId) {
-      whereClause += ` AND creator_id = $${paramIndex}`;
+      whereClause += ` AND m.creator_id = $${paramIndex}`;
       params.push(filters.creatorId);
       paramIndex++;
     }
@@ -185,6 +185,57 @@ class Match {
     `, [userId]);
 
     return result.rows.map(row => new Match(row));
+  }
+
+  // 获取match的bgio_match_id
+  static async getBgioMatchId(matchId) {
+    const result = await query('SELECT bgio_match_id FROM matches WHERE id = $1', [matchId]);
+    return result.rows.length > 0 ? result.rows[0].bgio_match_id : null;
+  }
+
+  // 更新match的bgio_match_id
+  static async updateBgioMatchId(matchId, bgioMatchId) {
+    const result = await query('UPDATE matches SET bgio_match_id = $1 WHERE id = $2 RETURNING *', [bgioMatchId, matchId]);
+    return result.rows.length > 0 ? new Match(result.rows[0]) : null;
+  }
+
+  // 获取match的AI玩家信息
+  static async getAIPlayers(matchId) {
+    const result = await query(`
+      SELECT 
+        mp.*,
+        at.endpoint,
+        at.config_schema,
+        at.name as ai_type_name
+      FROM match_players mp
+      JOIN ai_types at ON mp.ai_type_id = at.id
+      WHERE mp.match_id = $1 
+      AND mp.player_type = 'ai' 
+      AND mp.status = 'joined'
+      ORDER BY mp.seat_index
+    `, [matchId]);
+    return result.rows;
+  }
+
+  // 获取match的第一个玩家
+  static async getFirstPlayer(matchId) {
+    const result = await query(
+      'SELECT seat_index, player_name, player_type FROM match_players WHERE match_id = $1 ORDER BY seat_index LIMIT 1',
+      [matchId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  // 根据match ID查找bgio_match_id
+  static async findBgioMatchIdByMatchId(matchId) {
+    const result = await query('SELECT bgio_match_id FROM matches WHERE id = $1', [matchId]);
+    return result.rows.length > 0 ? result.rows[0].bgio_match_id : null;
+  }
+
+  // 查找AI类型
+  static async findAITypeById(aiTypeId) {
+    const result = await query('SELECT * FROM ai_types WHERE id = $1 AND status = $2', [aiTypeId, 'active']);
+    return result.rows.length > 0 ? result.rows[0] : null;
   }
 }
 

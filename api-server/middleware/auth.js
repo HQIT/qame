@@ -5,6 +5,9 @@ const User = require('../models/User');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// 内部服务认证密钥
+const INTERNAL_SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY || 'internal-service-secret-key-2024';
+
 // 生成JWT令牌
 function generateToken(user) {
   return jwt.sign(
@@ -29,6 +32,19 @@ function verifyToken(token) {
 // 认证中间件
 async function authenticateToken(req, res, next) {
   try {
+    // 检查是否是内部服务请求
+    const internalServiceKey = req.headers['x-internal-service-key'];
+    if (internalServiceKey === INTERNAL_SERVICE_KEY) {
+      console.log('🔧 内部服务认证通过');
+      // 创建一个虚拟的系统用户
+      req.user = {
+        id: 0,
+        username: 'system',
+        role: 'system'
+      };
+      return next();
+    }
+
     // 优先从Authorization header获取token，其次从Cookie获取
     let token = null;
     const authHeader = req.headers['authorization'];
@@ -138,5 +154,6 @@ module.exports = {
   optionalAuth,
   authenticateAdmin,
   JWT_SECRET,
-  JWT_EXPIRES_IN
+  JWT_EXPIRES_IN,
+  INTERNAL_SERVICE_KEY
 }; 
