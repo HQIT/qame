@@ -91,6 +91,24 @@ router.delete('/clients', async (req, res) => {
   }
 });
 
+// 将AI客户端分配到指定match
+router.post('/clients/:clientId/assign', async (req, res) => {
+  try {
+    const aiManager = getAIManager(req);
+    const { clientId } = req.params;
+    const { matchId, gameType } = req.body;
+
+    if (!matchId) {
+      return res.status(400).json(formatResponse(400, '缺少matchId'));
+    }
+
+    const result = await aiManager.assignClientToMatch(clientId, matchId, gameType);
+    res.json(formatResponse(200, '分配成功', result));
+  } catch (error) {
+    res.status(500).json(formatResponse(500, '分配失败', error.message));
+  }
+});
+
 // ========== AI配置管理 (合并LLM配置+AI类型+AI提供商) ==========
 
 // 获取所有AI配置

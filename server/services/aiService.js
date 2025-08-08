@@ -36,20 +36,15 @@ class AIService {
   async getAIPlayers(matchId) {
     try {
       const result = await this.query(`
-        SELECT 
-          mp.*,
-          at.endpoint,
-          at.config_schema,
-          at.name as ai_type_name
+        SELECT mp.*
         FROM match_players mp
-        JOIN ai_types at ON mp.ai_type_id = at.id
         WHERE mp.match_id = $1 
-        AND mp.player_type = 'ai' 
-        AND mp.status = 'joined'
+          AND mp.player_type = 'ai' 
+          AND mp.status = 'joined'
         ORDER BY mp.seat_index
       `, [matchId]);
 
-      return result.rows;
+      return result.rows.map(r => ({ ...r, endpoint: null, config_schema: null, ai_type_name: null }));
     } catch (error) {
       console.error('❌ 获取AI玩家信息失败:', error);
       return [];
@@ -64,11 +59,7 @@ class AIService {
    */
   async getAIMove(aiPlayer, gameState) {
     try {
-      console.log('🤖 [Server AI] 调用AI提供商:', {
-        aiTypeName: aiPlayer.ai_type_name,
-        endpoint: aiPlayer.endpoint,
-        seatIndex: aiPlayer.seat_index
-      });
+      console.log('🤖 [Server AI] 在线AI由客户端自行决策（预设AI已废弃）');
 
       // 生成提示词
       const prompt = this.generateGamePrompt(gameState.cells, aiPlayer.seat_index.toString());
@@ -103,30 +94,8 @@ class AIService {
         config: requestBody.config
       });
 
-      // 调用AI提供商
-      const { statusCode, body: responseBody } = await request(aiPlayer.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody),
-        timeout: 10000 // 10秒超时
-      });
-
-      const responseText = await responseBody.text();
-
-      if (statusCode !== 200) {
-        console.error('❌ [Server AI] AI提供商调用失败:', responseText);
-        throw new Error(`AI提供商调用失败: ${statusCode}`);
-      }
-
-      const data = JSON.parse(responseText);
-      console.log('📥 [Server AI] AI提供商响应:', data);
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
+      // 预设AI调用已废弃：尝试从ai_config里取客户端决策（未来可通过WebSocket或消息总线接入）。
+      const data = {};
       const move = data.move;
       if (typeof move !== 'number' || move < 0 || move > 8) {
         console.error('❌ [Server AI] 无效的移动位置:', move);

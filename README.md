@@ -14,7 +14,7 @@
 ## ⚠️ 重要说明
 
 **本项目不提供用户注册功能，所有用户账户由管理员通过管理控制台创建。**
-- 系统启动时会自动创建默认管理员账户（用户名：admin，密码：admin123）
+- 系统启动时会自动创建默认管理员账户（用户名：admin，密码：请查看docker-compose.yml中的ADMIN_PASSWORD环境变量）
 - 管理员可以通过管理控制台创建新用户
 - 用户无法自行注册账户
 
@@ -95,19 +95,19 @@ docker-compose up --build
    ```bash
    # 在.env文件中配置
    LLM_API_ENDPOINT=https://api.openai.com/v1/chat/completions
-   LLM_API_KEY=your-openai-api-key
+   LLM_API_KEY=your_openai_api_key_here
    LLM_MODEL=gpt-3.5-turbo
    ```
 
 2. **启动AI客户端**
    ```bash
    # 使用Docker Compose（推荐）
-   docker-compose up ai-client
+   docker-compose up ai-manager
    
    # 或直接运行
-   cd ai-client
+   cd ai-manager
    npm install
-   node src/index.js <matchID> <playerID> <credentials>
+   npm start
    ```
 
 3. **AI行为配置**
@@ -129,17 +129,18 @@ boardgame/
 │   ├── games/                 # 游戏逻辑
 │   ├── server.js              # 服务器文件
 │   └── package.json
-├── ai-client/                  # AI客户端（新增）
+├── ai-manager/                 # AI管理服务
 │   ├── src/
-│   │   ├── AIClient.js        # AI客户端核心
+│   │   ├── AIClientManager.js # AI客户端管理器
 │   │   ├── LLMService.js      # LLM服务接口
 │   │   ├── GameStateAnalyzer.js # 游戏状态分析
-│   │   └── index.js           # 主入口
+│   │   ├── SimpleAIClient.js  # 简单AI客户端
+│   │   └── server.js          # 主服务器
 │   ├── config/
-│   │   └── ai-config.js       # AI配置
-│   ├── test/                  # 测试文件
-│   ├── Dockerfile             # AI客户端Dockerfile
-│   └── README.md              # AI客户端文档
+│   │   └── database.js        # 数据库配置
+│   ├── models/                # 数据模型
+│   ├── public/                # 静态文件
+│   └── Dockerfile             # AI管理器Dockerfile
 ├── api-server/                 # API服务器
 │   ├── routes/                # API路由
 │   ├── models/                # 数据模型
@@ -155,15 +156,15 @@ boardgame/
 2. 在 `frontend/src/games/` 创建游戏界面
 3. 在 `server/server.js` 中注册游戏
 4. 在 `frontend/src/App.js` 中添加游戏组件
-5. 在 `ai-client/src/GameStateAnalyzer.js` 中添加游戏分析逻辑
+5. 在 `ai-manager/src/GameStateAnalyzer.js` 中添加游戏分析逻辑
 
 ### 扩展AI功能
 
 1. **添加新的AI策略**
    ```bash
-   # 在ai-client/src/下创建新的AI策略类
+   # 在ai-manager/src/下创建新的AI策略类
    # 实现getMove(gameAnalysis)方法
-   # 在AIClient.js中集成新策略
+   # 在AIClientManager.js中集成新策略
    ```
 
 2. **支持新的LLM服务**
@@ -186,8 +187,8 @@ cd server
 npm install
 npm run dev
 
-# 启动AI客户端
-cd ai-client
+# 启动AI管理器
+cd ai-manager
 npm install
 npm run dev
 ```
@@ -213,11 +214,11 @@ npm run dev
 ### 调试模式
 
 ```bash
-# 启用AI客户端调试模式
-AI_DEBUG=true docker-compose up ai-client
+# 启用AI管理器调试模式
+NODE_ENV=development docker-compose up ai-manager
 
 # 查看详细日志
-docker-compose logs -f ai-client
+docker-compose logs -f ai-manager
 ```
 
 ## �� 许可证

@@ -240,11 +240,12 @@ class User {
             COUNT(DISTINCT CASE WHEN u.player_type = 'human' THEN u.id END) as human,
             COUNT(DISTINCT CASE WHEN u.player_type = 'ai' THEN u.id END) as ai
           FROM (
-            SELECT id::text, 'human' as player_type FROM user_online_status 
-            WHERE last_heartbeat > NOW() - INTERVAL '2 minutes'
+            SELECT uo.user_id::text AS id, 'human' as player_type FROM user_online_status uo
+            WHERE uo.last_heartbeat > NOW() - INTERVAL '5 minutes'
             UNION ALL
-            SELECT id::text, 'ai' as player_type FROM ai_clients 
-            WHERE status = 'connected'
+            SELECT ac.id::text AS id, 'ai' as player_type FROM ai_clients ac
+            WHERE ac.status IN ('connected', 'connecting') 
+              AND ac.last_seen > NOW() - INTERVAL '5 minutes'
           ) u
         `);
       } catch (onlineError) {
@@ -256,7 +257,7 @@ class User {
             COUNT(*) as human,
             0 as ai
           FROM user_online_status 
-          WHERE last_heartbeat > NOW() - INTERVAL '2 minutes'
+          WHERE last_heartbeat > NOW() - INTERVAL '5 minutes'
         `);
       }
       

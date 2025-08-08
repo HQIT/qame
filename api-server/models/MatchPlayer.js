@@ -12,7 +12,6 @@ class MatchPlayer {
       seatIndex, 
       playerType, 
       userId = null, 
-      aiTypeId = null, 
       playerName, 
       aiConfig = {} 
     } = data;
@@ -21,39 +20,18 @@ class MatchPlayer {
     if (playerType === 'human' && !userId) {
       throw new Error('Human player must have userId');
     }
-    if (playerType === 'ai' && !aiTypeId) {
-      throw new Error('AI player must have aiTypeId');
+    if (playerType === 'ai' && !(aiConfig && aiConfig.clientId)) {
+      throw new Error('AI player must have aiConfig.clientId');
     }
 
-    // 检查是否有已离开的玩家占用此座位，如果有则重用该记录
-    const existingLeftPlayer = await query(`
-      SELECT * FROM match_players 
-      WHERE match_id = $1 AND seat_index = $2 AND status = 'left'
-      ORDER BY left_at DESC 
-      LIMIT 1
-    `, [matchId, seatIndex]);
+    // 直接创建新记录
+    const result = await query(`
+      INSERT INTO match_players (match_id, seat_index, player_type, user_id, player_name, ai_config)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [matchId, seatIndex, playerType, userId, playerName, JSON.stringify(aiConfig)]);
 
-    if (existingLeftPlayer.rows.length > 0) {
-      // 重用已离开玩家的记录
-      const result = await query(`
-        UPDATE match_players 
-        SET player_type = $1, user_id = $2, ai_type_id = $3, player_name = $4, 
-            ai_config = $5, status = 'joined', joined_at = CURRENT_TIMESTAMP, left_at = NULL
-        WHERE id = $6
-        RETURNING *
-      `, [playerType, userId, aiTypeId, playerName, JSON.stringify(aiConfig), existingLeftPlayer.rows[0].id]);
-      
-      return new MatchPlayer(result.rows[0]);
-    } else {
-      // 创建新记录
-      const result = await query(`
-        INSERT INTO match_players (match_id, seat_index, player_type, user_id, ai_type_id, player_name, ai_config)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *
-      `, [matchId, seatIndex, playerType, userId, aiTypeId, playerName, JSON.stringify(aiConfig)]);
-
-      return new MatchPlayer(result.rows[0]);
-    }
+    return new MatchPlayer(result.rows[0]);
   }
 
   // 获取match的所有玩家
@@ -61,14 +39,10 @@ class MatchPlayer {
     const result = await query(`
       SELECT 
         mp.*,
-        u.username as user_name,
-        at.name as ai_type_name,
-        ap.name as ai_provider_name
+        u.username as user_name
       FROM match_players mp
       LEFT JOIN users u ON mp.user_id = u.id
-      LEFT JOIN ai_types at ON mp.ai_type_id = at.id
-      LEFT JOIN ai_providers ap ON at.provider_id = ap.id
-      WHERE mp.match_id = $1 AND mp.status != 'left'
+      WHERE mp.match_id = $1
       ORDER BY mp.seat_index
     `, [matchId]);
 
@@ -80,13 +54,9 @@ class MatchPlayer {
     const result = await query(`
       SELECT 
         mp.*,
-        u.username as user_name,
-        at.name as ai_type_name,
-        ap.name as ai_provider_name
+        u.username as user_name
       FROM match_players mp
       LEFT JOIN users u ON mp.user_id = u.id
-      LEFT JOIN ai_types at ON mp.ai_type_id = at.id
-      LEFT JOIN ai_providers ap ON at.provider_id = ap.id
       WHERE mp.id = $1
     `, [playerId]);
 
@@ -96,8 +66,7 @@ class MatchPlayer {
   // 移除玩家
   static async removePlayer(matchId, playerId) {
     const result = await query(`
-      UPDATE match_players 
-      SET status = 'left', left_at = CURRENT_TIMESTAMP
+      DELETE FROM match_players 
       WHERE match_id = $1 AND id = $2
       RETURNING *
     `, [matchId, playerId]);
@@ -108,9 +77,8 @@ class MatchPlayer {
   // 通过座位索引移除玩家
   static async removePlayerBySeat(matchId, seatIndex) {
     const result = await query(`
-      UPDATE match_players 
-      SET status = 'left', left_at = CURRENT_TIMESTAMP
-      WHERE match_id = $1 AND seat_index = $2 AND status != 'left'
+      DELETE FROM match_players 
+      WHERE match_id = $1 AND seat_index = $2
       RETURNING *
     `, [matchId, seatIndex]);
 
@@ -119,11 +87,15 @@ class MatchPlayer {
 
   // 检查座位是否可用
   static async isSeatAvailable(matchId, seatIndex) {
-    const result = await query(`
-      SELECT 1 FROM match_players 
-      WHERE match_id = $1 AND seat_index = $2 AND status != 'left'
-    `, [matchId, seatIndex]);
+    // 读取match最大席位，防止越界
+    const matchRes = await query('SELECT max_players FROM matches WHERE id = $1', [matchId]);
+    const maxPlayers = matchRes.rows.length ? parseInt(matchRes.rows[0].max_players) : 0;
+    if (seatIndex < 0 || seatIndex >= maxPlayers) return false;
 
+    const result = await query(
+      'SELECT 1 FROM match_players WHERE match_id = $1 AND seat_index = $2',
+      [matchId, seatIndex]
+    );
     return result.rows.length === 0;
   }
 
@@ -142,20 +114,31 @@ class MatchPlayer {
   // 检查用户是否在match中
   static async isUserInMatch(userId, matchId) {
     const result = await query(
-      'SELECT 1 FROM match_players WHERE user_id = $1 AND match_id = $2 AND status != $3',
-      [userId, matchId, 'left']
+      'SELECT 1 FROM match_players WHERE user_id = $1 AND match_id = $2',
+      [userId, matchId]
     );
     return result.rows.length > 0;
   }
 
   // 获取下一个可用座位
   static async getNextAvailableSeat(matchId) {
-    const result = await query(`
-      SELECT COALESCE(MAX(seat_index), -1) + 1 as next_seat
-      FROM match_players 
-      WHERE match_id = $1 AND status != 'left'
-    `, [matchId]);
-    return parseInt(result.rows[0].next_seat);
+    // 获取最大玩家数
+    const matchRes = await query('SELECT max_players FROM matches WHERE id = $1', [matchId]);
+    if (!matchRes.rows.length) return -1;
+    const maxPlayers = parseInt(matchRes.rows[0].max_players);
+
+    // 查询当前占用的座位
+    const occRes = await query(
+      'SELECT seat_index FROM match_players WHERE match_id = $1 ORDER BY seat_index',
+      [matchId]
+    );
+    const occupied = new Set(occRes.rows.map(r => parseInt(r.seat_index)));
+
+    // 返回第一个空位 [0, maxPlayers-1]
+    for (let i = 0; i < maxPlayers; i++) {
+      if (!occupied.has(i)) return i;
+    }
+    return -1;
   }
 
   // 检查AI类型是否存在
@@ -168,7 +151,7 @@ class MatchPlayer {
   static async checkAIExists(matchId, aiTypeId) {
     const result = await query(`
       SELECT * FROM match_players 
-      WHERE match_id = $1 AND ai_type_id = $2 AND status != 'left'
+      WHERE match_id = $1 AND ai_type_id = $2
     `, [matchId, aiTypeId]);
     return result.rows.length > 0 ? result.rows[0] : null;
   }
@@ -227,22 +210,21 @@ class MatchPlayer {
   }
 
   // 查找已存在的AI玩家
-  static async findExistingAIPlayer(matchId, aiTypeId) {
-    const result = await query(`
-      SELECT * FROM match_players 
-      WHERE match_id = $1 AND ai_type_id = $2 AND status = 'left'
-      ORDER BY left_at DESC 
-      LIMIT 1
-    `, [matchId, aiTypeId]);
-    return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
-  }
+  // findExistingAIPlayer方法已删除，不再需要处理left状态
 
   // 更新玩家凭证
   static async updatePlayerCredentials(matchId, userId, playerCredentials) {
-    const result = await query(
-      'UPDATE match_players SET player_credentials = $1 WHERE match_id = $2 AND user_id = $3 RETURNING *',
-      [playerCredentials, matchId, userId]
-    );
+    // 只更新该match中该用户最新一条非left记录的凭证
+    const result = await query(`
+      UPDATE match_players SET player_credentials = $1
+      WHERE id = (
+        SELECT id FROM match_players 
+        WHERE match_id = $2 AND user_id = $3
+        ORDER BY joined_at DESC
+        LIMIT 1
+      )
+      RETURNING *
+    `, [playerCredentials, matchId, userId]);
     return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
   }
 
@@ -279,6 +261,7 @@ class MatchPlayer {
       aiTypeName: this.ai_type_name,
       aiProviderName: this.ai_provider_name,
       userName: this.user_name,
+      userId: this.user_id,
       joinedAt: this.joined_at
     };
   }

@@ -90,13 +90,9 @@ class Match {
     const playersResult = await query(`
       SELECT 
         mp.*,
-        u.username as user_name,
-        at.name as ai_type_name,
-        ap.name as ai_provider_name
+        u.username as user_name
       FROM match_players mp
       LEFT JOIN users u ON mp.user_id = u.id
-      LEFT JOIN ai_types at ON mp.ai_type_id = at.id
-      LEFT JOIN ai_providers ap ON at.provider_id = ap.id
       WHERE mp.match_id = $1
       ORDER BY mp.seat_index
     `, [matchId]);
@@ -154,8 +150,8 @@ class Match {
   // 获取match的玩家数量
   static async getPlayerCount(matchId) {
     const result = await query(
-      'SELECT COUNT(*) as count FROM match_players WHERE match_id = $1 AND status != $2',
-      [matchId, 'left']
+      'SELECT COUNT(*) as count FROM match_players WHERE match_id = $1',
+      [matchId]
     );
     return parseInt(result.rows[0].count);
   }
@@ -180,7 +176,7 @@ class Match {
       JOIN match_players mp ON m.id = mp.match_id
       WHERE (m.creator_id = $1 OR mp.user_id = $1)
         AND m.status IN ('waiting', 'ready', 'playing')
-        AND mp.status != 'left'
+
       ORDER BY m.updated_at DESC
     `, [userId]);
 
@@ -202,19 +198,14 @@ class Match {
   // 获取match的AI玩家信息
   static async getAIPlayers(matchId) {
     const result = await query(`
-      SELECT 
-        mp.*,
-        at.endpoint,
-        at.config_schema,
-        at.name as ai_type_name
+      SELECT mp.*
       FROM match_players mp
-      JOIN ai_types at ON mp.ai_type_id = at.id
       WHERE mp.match_id = $1 
-      AND mp.player_type = 'ai' 
-      AND mp.status = 'joined'
+        AND mp.player_type = 'ai' 
+        AND mp.status = 'joined'
       ORDER BY mp.seat_index
     `, [matchId]);
-    return result.rows;
+    return result.rows.map(r => ({ ...r, endpoint: null, config_schema: null, ai_type_name: null }));
   }
 
   // 获取match的第一个玩家
@@ -232,11 +223,7 @@ class Match {
     return result.rows.length > 0 ? result.rows[0].bgio_match_id : null;
   }
 
-  // 查找AI类型
-  static async findAITypeById(aiTypeId) {
-    const result = await query('SELECT * FROM ai_types WHERE id = $1 AND status = $2', [aiTypeId, 'active']);
-    return result.rows.length > 0 ? result.rows[0] : null;
-  }
+  // 预设AI类型已移除
 }
 
 module.exports = Match;

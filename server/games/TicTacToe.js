@@ -9,7 +9,7 @@ const TicTacToe = {
     console.log('🔥 [SETUP] setupData:', setupData);
     
     return {
-      cells: Array(9).fill(null),
+      cells: [null, null, null, null, null, null, null, null, null], // 明确使用null值
       matchId: setupData?.matchId || null, // Match ID - 保留用于日志
     };
   },

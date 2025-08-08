@@ -40,7 +40,11 @@ class OnlineUser {
           WHEN mp.id IS NOT NULL AND m.status IN ('waiting', 'ready', 'playing') THEN 'playing'
           ELSE 'idle'
         END as status,
-        m.id as match_id
+        m.id as match_id,
+        m.game_id,
+        g.name as game_name,
+        m.status as match_status,
+        mp.id as match_player_id
       FROM user_online_status uo
       JOIN users u ON uo.user_id = u.id
       LEFT JOIN LATERAL (
@@ -51,6 +55,7 @@ class OnlineUser {
         LIMIT 1
       ) mp ON true
       LEFT JOIN matches m ON mp.match_id = m.id AND m.status IN ('waiting', 'ready', 'playing')
+      LEFT JOIN games g ON m.game_id = g.id
       
       UNION ALL
       
@@ -68,8 +73,17 @@ class OnlineUser {
           WHEN ac.status = 'connected' THEN 'idle'
           ELSE 'offline'
         END as status,
-        ac.match_id
+        ac.match_id,
+        m.game_id,
+        g.name as game_name,
+        m.status as match_status,
+        mp_ai.id as match_player_id
       FROM ai_clients ac
+      LEFT JOIN matches m ON ac.match_id = m.id
+      LEFT JOIN games g ON m.game_id = g.id
+      LEFT JOIN match_players mp_ai ON mp_ai.match_id = ac.match_id 
+        AND mp_ai.player_type = 'ai' 
+        AND mp_ai.player_name = ac.player_name
       WHERE ac.status IN ('connected', 'connecting') 
         AND ac.last_seen > CURRENT_TIMESTAMP - INTERVAL '${timeoutMinutes} minutes'
       
@@ -96,11 +110,16 @@ class OnlineUser {
               WHEN mp.id IS NOT NULL AND m.status IN ('waiting', 'ready', 'playing') THEN 'playing'
               ELSE 'idle'
             END as status,
-            m.id as match_id
+            m.id as match_id,
+            m.game_id,
+            g.name as game_name,
+            m.status as match_status,
+            mp.id as match_player_id
           FROM user_online_status uo
           JOIN users u ON uo.user_id = u.id
           LEFT JOIN match_players mp ON u.id = mp.user_id AND mp.status IN ('joined', 'ready', 'playing')
           LEFT JOIN matches m ON mp.match_id = m.id AND m.status IN ('waiting', 'ready', 'playing')
+          LEFT JOIN games g ON m.game_id = g.id
           ORDER BY uo.online_since ASC;
         `;
         const result = await db.query(humanOnlyQuery);
@@ -238,11 +257,15 @@ class OnlineUser {
           WHEN mp.id IS NOT NULL AND m.status IN ('waiting', 'ready', 'playing') THEN 'playing'
           ELSE 'idle'
         END as status,
-        m.id as match_id
+        m.id as match_id,
+        m.game_id,
+        g.name as game_name,
+        m.status as match_status
       FROM user_online_status uo
       JOIN users u ON uo.user_id = u.id
       LEFT JOIN match_players mp ON u.id = mp.user_id AND mp.status IN ('joined', 'ready', 'playing')
       LEFT JOIN matches m ON mp.match_id = m.id AND m.status IN ('waiting', 'ready', 'playing')
+      LEFT JOIN games g ON m.game_id = g.id
       WHERE u.id = $1;
     `;
     

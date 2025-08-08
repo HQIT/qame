@@ -41,6 +41,46 @@ const OnlinePlayers = ({ currentUser }) => {
     }
   };
 
+  // 强制玩家离开游戏
+  const forceLeaveGame = async (user) => {
+    if (!user.match_id) return;
+    
+    try {
+      const confirmed = window.confirm(`确定要让 ${user.username} 离开游戏吗？`);
+      if (!confirmed) return;
+      
+      // 构建请求参数 - 直接使用玩家ID
+      if (!user.match_player_id) {
+        error('该玩家没有有效的游戏记录');
+        return;
+      }
+      
+      const requestBody = {
+        playerId: user.match_player_id
+      };
+      
+      // 使用专门的管理员强制离开API
+      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/matches/${user.match_id}/force-leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        console.log(`✅ 成功让 ${user.username} 离开游戏`);
+        // 刷新在线用户列表
+        fetchOnlineUsers();
+      } else {
+        console.error('❌ 强制离开游戏失败:', response.status);
+        alert('操作失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('❌ 强制离开游戏失败:', error);
+      alert('操作失败，请稍后重试');
+    }
+  };
+
   // 发送心跳保持在线状态
   const sendHeartbeat = async () => {
     try {
@@ -121,6 +161,20 @@ const OnlinePlayers = ({ currentUser }) => {
         return { icon: '🎮', text: '游戏中', color: '#3498db' };
       default:
         return { icon: '⚪', text: '未知', color: '#95a5a6' };
+    }
+  };
+
+  // 获取游戏状态文本
+  const getMatchStatusText = (matchStatus) => {
+    switch (matchStatus) {
+      case 'waiting':
+        return '等待中';
+      case 'ready':
+        return '准备中';
+      case 'playing':
+        return '游戏中';
+      default:
+        return '';
     }
   };
 
@@ -206,7 +260,7 @@ const OnlinePlayers = ({ currentUser }) => {
       minHeight: '300px'
     }}>
       <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>
-        🌐 在线玩家 ({stats.total})
+        🌐 在线玩家 ({onlineUsers.length})
       </h3>
 
       {/* 统计信息 */}
@@ -306,9 +360,64 @@ const OnlinePlayers = ({ currentUser }) => {
                       {statusInfo.icon} {statusInfo.text}
                     </span>
                     <span style={{ marginLeft: '12px' }}>
-                      ⏱️ {formatDuration(user.onlineDuration)}
+                      ⏱️ {formatDuration((user.onlineDuration ?? user.online_duration ?? 0))}
                     </span>
                   </div>
+                  {/* 显示当前游戏信息 */}
+                  {user.status === 'playing' && user.game_name && (
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#3498db',
+                      marginTop: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <span>🎯 {user.game_name}</span>
+                      {user.match_status && (
+                        <span style={{ 
+                          marginLeft: '6px',
+                          backgroundColor: user.match_status === 'playing' ? '#e74c3c' : '#f39c12',
+                          color: 'white',
+                          padding: '1px 4px',
+                          borderRadius: '2px',
+                          fontSize: '10px'
+                        }}>
+                          {getMatchStatusText(user.match_status)}
+                        </span>
+                      )}
+                      {user.match_id && (
+                        <span style={{ 
+                          marginLeft: '6px',
+                          color: '#95a5a6',
+                          fontSize: '10px'
+                        }}>
+                          ID: {user.match_id.substring(0, 8)}...
+                        </span>
+                      )}
+                      {/* 强制离开游戏按钮 - 只对管理员显示 */}
+                      {currentUser && currentUser.role === 'admin' && (
+                        <button
+                          onClick={() => forceLeaveGame(user)}
+                          style={{
+                            marginLeft: '8px',
+                            padding: '1px 4px',
+                            backgroundColor: '#e74c3c',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '2px',
+                            cursor: 'pointer',
+                            fontSize: '9px',
+                            transition: 'background-color 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#c0392b'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#e74c3c'}
+                          title={`强制 ${user.username} 离开游戏`}
+                        >
+                          ✕ 离开
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -316,31 +425,7 @@ const OnlinePlayers = ({ currentUser }) => {
         )}
       </div>
 
-      {/* 刷新按钮 */}
-      <div style={{
-        textAlign: 'center',
-        marginTop: '15px',
-        paddingTop: '15px',
-        borderTop: '1px solid #ecf0f1'
-      }}>
-        <button
-          onClick={fetchOnlineUsers}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#3498db',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            transition: 'background-color 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
-        >
-          🔄 刷新
-        </button>
-      </div>
+
     </div>
   );
 };

@@ -583,6 +583,54 @@ class AIClientManager {
       aiTypeCount: this.aiTypes.size
     };
   }
+
+  /**
+   * 将AI客户端分配到指定match
+   */
+  async assignClientToMatch(clientId, matchId, gameType) {
+    try {
+      // 获取数据库中的客户端
+      const dbClient = await AIClientModel.getById(clientId);
+      if (!dbClient) {
+        throw new Error(`AI客户端 ${clientId} 不存在`);
+      }
+ 
+      // 仅在提供或已有记录时使用gameType，不做默认fallback
+      const targetGameType = gameType || dbClient.game_type;
+      if (!targetGameType) {
+        throw new Error('缺少gameType，且客户端记录中也无game_type');
+      }
+ 
+      // 优先使用内存中的客户端
+      let client = this.clients.get(clientId);
+ 
+      if (!client) {
+        // 如果内存中没有，尝试重连并创建内存实例
+        await this.reconnectClient(clientId);
+        client = this.clients.get(clientId);
+      }
+ 
+      // 更新数据库中的match_id
+      await AIClientModel.updateStatus(clientId, dbClient.status || 'connected', { match_id: matchId, last_seen: new Date() });
+ 
+      // 如果内存客户端存在，指示其加入match
+      if (client && typeof client.joinMatch === 'function') {
+        client.matchId = matchId;
+        client.gameType = targetGameType;
+        await client.joinMatch(matchId);
+      }
+ 
+      return {
+        id: clientId,
+        matchId,
+        gameType: targetGameType,
+        status: 'assigned'
+      };
+    } catch (error) {
+      console.error(`❌ [AI Manager] 分配AI客户端到match失败:`, error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = { AIClientManager };
