@@ -13,23 +13,71 @@ class MatchPlayer {
       playerType, 
       userId = null, 
       playerName, 
-      aiConfig = {} 
+      aiPlayerId = null
     } = data;
+
+    // 防止重复加入同一座位
+    const existingPlayer = await query(`
+      SELECT * FROM match_players
+      WHERE match_id = $1 AND seat_index = $2 AND status != 'left'
+    `, [matchId, seatIndex]);
+
+    if (existingPlayer.rows.length > 0) {
+      throw new Error('Seat already taken');
+    }
 
     // 验证数据
     if (playerType === 'human' && !userId) {
       throw new Error('Human player must have userId');
     }
-    if (playerType === 'ai' && !(aiConfig && aiConfig.clientId)) {
-      throw new Error('AI player must have aiConfig.clientId');
+    if (playerType === 'ai' && !aiPlayerId) {
+      throw new Error('AI player must have aiPlayerId');
     }
 
-    // 直接创建新记录
+    // 获取或创建unified player记录
+    let playerId;
+    if (playerType === 'human') {
+      // 查找现有的human player记录
+      const playerResult = await query(`
+        SELECT id FROM players WHERE user_id = $1 AND player_type = 'human'
+      `, [userId]);
+      
+      if (playerResult.rows.length > 0) {
+        playerId = playerResult.rows[0].id;
+      } else {
+        // 创建新的human player记录
+        const newPlayerResult = await query(`
+          INSERT INTO players (player_name, player_type, user_id, status)
+          VALUES ($1, 'human', $2, 'active')
+          RETURNING id
+        `, [playerName, userId]);
+        playerId = newPlayerResult.rows[0].id;
+      }
+    } else if (playerType === 'ai') {
+      // 查找现有的AI player记录
+      const playerResult = await query(`
+        SELECT id FROM players WHERE ai_player_id = $1 AND player_type = 'ai'
+      `, [aiPlayerId]);
+      
+      if (playerResult.rows.length > 0) {
+        playerId = playerResult.rows[0].id;
+      } else {
+        // 创建新的AI player记录
+        const newPlayerResult = await query(`
+          INSERT INTO players (player_name, player_type, ai_player_id, status)
+          VALUES ($1, 'ai', $2, 'active')
+          RETURNING id
+        `, [playerName, aiPlayerId]);
+        playerId = newPlayerResult.rows[0].id;
+      }
+    }
+
+    // 插入match_players记录（兼容新旧字段结构）
     const result = await query(`
-      INSERT INTO match_players (match_id, seat_index, player_type, user_id, player_name, ai_config)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO match_players (match_id, seat_index, player_type, player_id, player_name)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [matchId, seatIndex, playerType, userId, playerName, JSON.stringify(aiConfig)]);
+    `, [matchId, seatIndex, playerType, playerId, playerName]);
 
     return new MatchPlayer(result.rows[0]);
   }

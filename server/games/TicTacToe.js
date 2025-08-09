@@ -50,6 +50,35 @@ const TicTacToe = {
       console.log(`✅ 玩家 ${playerID} 在位置 ${id} 放置棋子`);
       console.log('更新后的棋盘:', G.cells);
     },
+    
+    /**
+     * 重新开始游戏
+     * 允许在游戏结束后执行
+     */
+    restartGame: {
+      move: ({ G, ctx, events }) => {
+        console.log('服务器端：重新开始游戏');
+        
+        // 重置游戏状态
+        G.cells = Array(9).fill(null);
+        
+        // 重置任何错误状态
+        if (G.aiError) {
+          delete G.aiError;
+        }
+        
+        console.log('游戏已重新开始，棋盘状态:', G.cells);
+      },
+      // 允许在游戏结束后执行此移动
+      ignoreStaleStateID: true,
+    },
+    
+    /**
+     * 记录AI错误（由AI管理器调用）
+     */
+    reportAIError({ G }, message) {
+      G.aiError = typeof message === 'string' ? message : 'AI unavailable';
+    },
   },
 
   endIf: ({ G, ctx }) => {
@@ -64,6 +93,13 @@ const TicTacToe = {
     if (!G.cells) {
       console.log('服务器端：G.cells 为空，跳过结束检查');
       return;
+    }
+    
+    // 检查是否是空棋盘（重新开始后的状态）
+    const isEmptyBoard = G.cells.every(cell => cell === null);
+    if (isEmptyBoard) {
+      console.log('服务器端：空棋盘，游戏未结束');
+      return; // 游戏未结束
     }
     
     console.log('服务器端检查游戏结束状态:', { cells: G.cells, currentPlayer: ctx.currentPlayer });

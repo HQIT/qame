@@ -3,25 +3,45 @@ const API_BASE = '/api';
 
 // 当前数据
 let currentClients = [];
-let currentLLMConfigs = [];
+let currentPlayers = [];
 let currentStats = {};
+let availableGames = [];
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     loadInitialData();
     
     // 定期刷新数据
-    setInterval(loadStats, 5000); // 每5秒刷新统计
-    setInterval(refreshClients, 10000); // 每10秒刷新客户端列表
+    setInterval(loadStats, 10000); // 每10秒刷新统计
+    setInterval(refreshClients, 15000); // 每15秒刷新客户端列表
+    setInterval(refreshPlayers, 15000); // 每15秒刷新玩家列表
 });
 
-// ========== 数据加载 ==========
+// ========== 初始化数据加载 ==========
 
 async function loadInitialData() {
+    await loadAvailableGames();
     await loadStats();
     await refreshClients();
-    await refreshLLMConfigs();
-    loadLLMConfigOptions();
+    await refreshPlayers();
+}
+
+async function loadAvailableGames() {
+    try {
+        // 从game-server获取支持的游戏列表
+        const response = await fetch('/games/api/games');
+        const result = await response.json();
+        
+        if (result.code === 200) {
+            availableGames = result.data || [];
+        } else {
+            // 如果无法获取，使用默认游戏列表
+            availableGames = ['TicTacToe'];
+        }
+    } catch (error) {
+        console.error('加载游戏列表失败:', error);
+        availableGames = ['TicTacToe']; // 默认游戏
+    }
 }
 
 async function loadStats() {
@@ -39,10 +59,37 @@ async function loadStats() {
 }
 
 function updateStatsDisplay() {
-    document.getElementById('totalClients').textContent = currentStats.totalClients || 0;
-    document.getElementById('runningClients').textContent = currentStats.statusCounts?.running || 0;
-    document.getElementById('llmConfigs').textContent = currentStats.llmConfigCount || 0;
-    document.getElementById('aiTypes').textContent = currentStats.aiTypeCount || 0;
+    document.getElementById('totalClients').textContent = currentStats.clients?.total || 0;
+    document.getElementById('totalPlayers').textContent = currentStats.players?.total || 0;
+    document.getElementById('activePlayers').textContent = currentStats.players?.active || 0;
+    
+    // 计算支持的游戏数量
+    const supportedGames = new Set();
+    if (currentStats.clients?.by_games) {
+        Object.keys(currentStats.clients.by_games).forEach(game => {
+            supportedGames.add(game);
+        });
+    }
+    document.getElementById('supportedGames').textContent = supportedGames.size;
+}
+
+// ========== 标签页管理 ==========
+
+function showTab(tabName) {
+    // 隐藏所有标签页
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    
+    // 显示选中的标签页
+    event.target.classList.add('active');
+    document.getElementById(`${tabName}-panel`).classList.add('active');
+    
+    // 刷新对应数据
+    if (tabName === 'clients') {
+        refreshClients();
+    } else if (tabName === 'players') {
+        refreshPlayers();
+    }
 }
 
 // ========== AI客户端管理 ==========
@@ -56,10 +103,11 @@ async function refreshClients() {
             currentClients = result.data;
             renderClientsList();
         } else {
-            showError('加载AI客户端列表失败: ' + result.message);
+            showError('clients-list', '加载AI客户端失败: ' + result.message);
         }
     } catch (error) {
-        showError('加载AI客户端列表失败: ' + error.message);
+        console.error('获取AI客户端列表失败:', error);
+        showError('clients-list', '网络错误');
     }
 }
 
@@ -72,22 +120,26 @@ function renderClientsList() {
     }
     
     const html = currentClients.map(client => `
-        <div class="client-card">
-            <div class="client-header">
-                <div>
-                    <strong>${client.playerName || client.id}</strong>
-                    <span class="client-status status-${client.status}">${getStatusText(client.status)}</span>
+        <div class="list-item">
+            <h3>${escapeHtml(client.name)}</h3>
+            <div class="list-item-details">
+                <div class="detail-item">
+                    <span class="detail-label">客户端ID:</span> ${client.id}
                 </div>
-                <div>
-                    <button class="btn" onclick="showClientDetails('${client.id}')">详情</button>
-                    <button class="btn btn-danger" onclick="stopClient('${client.id}')">停止</button>
+                <div class="detail-item">
+                    <span class="detail-label">接口地址:</span> ${escapeHtml(client.endpoint)}
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">支持游戏:</span> ${client.supported_games.join(', ')}
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">创建时间:</span> ${formatDateTime(client.created_at)}
                 </div>
             </div>
-            <div>
-                <div><strong>游戏:</strong> ${client.gameType || '未指定'}</div>
-                <div><strong>AI类型:</strong> ${client.aiType || '未指定'}</div>
-                <div><strong>创建时间:</strong> ${formatTime(client.createdAt)}</div>
-                <div><strong>日志条数:</strong> ${client.logCount || 0}</div>
+            ${client.description ? `<div style="margin-bottom: 10px; color: #666;"><strong>描述:</strong> ${escapeHtml(client.description)}</div>` : ''}
+            <div class="list-item-actions">
+                <button class="btn btn-small" onclick="editClient('${client.id}')">编辑</button>
+                <button class="btn btn-small btn-danger" onclick="deleteClient('${client.id}')">删除</button>
             </div>
         </div>
     `).join('');
@@ -95,137 +147,201 @@ function renderClientsList() {
     container.innerHTML = html;
 }
 
-function getStatusText(status) {
-    const statusMap = {
-        'running': '运行中',
-        'stopped': '已停止',
-        'crashed': '已崩溃',
-        'starting': '启动中',
-        'stopping': '停止中'
-    };
-    return statusMap[status] || status;
+function showCreateClientModal() {
+    renderGamesCheckboxes('clientSupportedGames');
+    document.getElementById('createClientModal').style.display = 'block';
 }
 
-function formatTime(timeStr) {
-    return new Date(timeStr).toLocaleString('zh-CN');
+async function createClient() {
+    const name = document.getElementById('clientName').value.trim();
+    const endpoint = document.getElementById('clientEndpoint').value.trim();
+    const description = document.getElementById('clientDescription').value.trim();
+    const supported_games = getSelectedGames('clientSupportedGames');
+    
+    if (!name || !endpoint) {
+        alert('请填写客户端名称和接口地址');
+        return;
+    }
+    
+    if (supported_games.length === 0) {
+        alert('请至少选择一个支持的游戏');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/clients`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                endpoint,
+                supported_games,
+                description
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.code === 200) {
+            closeModal('createClientModal');
+            refreshClients();
+            loadStats();
+            clearClientForm();
+            showSuccess('clients-list', 'AI客户端创建成功');
+        } else {
+            alert('创建失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('创建AI客户端失败:', error);
+        alert('网络错误');
+    }
 }
 
-async function stopClient(clientId) {
-    if (!confirm('确定要停止这个AI客户端吗？')) return;
+function editClient(clientId) {
+    const client = currentClients.find(c => c.id === clientId);
+    if (!client) return;
+    
+    document.getElementById('editClientId').value = client.id;
+    document.getElementById('editClientName').value = client.name;
+    document.getElementById('editClientEndpoint').value = client.endpoint;
+    document.getElementById('editClientDescription').value = client.description || '';
+    
+    renderGamesCheckboxes('editClientSupportedGames', client.supported_games);
+    document.getElementById('editClientModal').style.display = 'block';
+}
+
+async function updateClient() {
+    const clientId = document.getElementById('editClientId').value;
+    const name = document.getElementById('editClientName').value.trim();
+    const endpoint = document.getElementById('editClientEndpoint').value.trim();
+    const description = document.getElementById('editClientDescription').value.trim();
+    const supported_games = getSelectedGames('editClientSupportedGames');
+    
+    if (!name || !endpoint) {
+        alert('请填写客户端名称和接口地址');
+        return;
+    }
+    
+    if (supported_games.length === 0) {
+        alert('请至少选择一个支持的游戏');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/clients/${clientId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                endpoint,
+                supported_games,
+                description
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.code === 200) {
+            closeModal('editClientModal');
+            refreshClients();
+            loadStats();
+            showSuccess('clients-list', 'AI客户端更新成功');
+        } else {
+            alert('更新失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('更新AI客户端失败:', error);
+        alert('网络错误');
+    }
+}
+
+async function deleteClient(clientId) {
+    if (!confirm('确定要删除这个AI客户端吗？这将删除所有相关的AI玩家。')) {
+        return;
+    }
     
     try {
         const response = await fetch(`${API_BASE}/clients/${clientId}`, {
             method: 'DELETE'
         });
+        
         const result = await response.json();
         
         if (result.code === 200) {
-            showSuccess('AI客户端已停止');
             refreshClients();
+            refreshPlayers(); // 刷新玩家列表，因为可能有相关玩家被删除
             loadStats();
+            showSuccess('clients-list', 'AI客户端删除成功');
         } else {
-            showError('停止失败: ' + result.message);
+            alert('删除失败: ' + result.message);
         }
     } catch (error) {
-        showError('停止失败: ' + error.message);
+        console.error('删除AI客户端失败:', error);
+        alert('网络错误');
     }
 }
 
-async function stopAllClients() {
-    if (!confirm('确定要停止所有AI客户端吗？')) return;
-    
+function clearClientForm() {
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientEndpoint').value = '';
+    document.getElementById('clientDescription').value = '';
+    // 取消所有游戏选择
+    document.querySelectorAll('#clientSupportedGames input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+}
+
+// ========== AI玩家管理 ==========
+
+async function refreshPlayers() {
     try {
-        const response = await fetch(`${API_BASE}/clients`, {
-            method: 'DELETE'
-        });
+        const response = await fetch(`${API_BASE}/players`);
         const result = await response.json();
         
         if (result.code === 200) {
-            showSuccess('所有AI客户端已停止');
-            refreshClients();
-            loadStats();
+            currentPlayers = result.data;
+            renderPlayersList();
         } else {
-            showError('停止失败: ' + result.message);
+            showError('players-list', '加载AI玩家失败: ' + result.message);
         }
     } catch (error) {
-        showError('停止失败: ' + error.message);
+        console.error('获取AI玩家列表失败:', error);
+        showError('players-list', '网络错误');
     }
 }
 
-function showCreateClientModal() {
-    document.getElementById('createClientModal').style.display = 'block';
-}
-
-async function createClient() {
-    const config = {
-        playerName: document.getElementById('clientPlayerName').value,
-        matchId: document.getElementById('clientMatchId').value,
-        gameType: document.getElementById('clientGameType').value,
-        aiType: document.getElementById('clientAIType').value,
-        llmConfig: document.getElementById('clientLLMConfig').value
-    };
+function renderPlayersList() {
+    const container = document.getElementById('players-list');
     
-    if (!config.playerName) {
-        showError('请输入玩家名称');
+    if (currentPlayers.length === 0) {
+        container.innerHTML = '<div class="loading">暂无AI玩家</div>';
         return;
     }
     
-    try {
-        const response = await fetch(`${API_BASE}/clients`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
-        });
-        const result = await response.json();
-        
-        if (result.code === 200) {
-            showSuccess('AI客户端创建成功');
-            closeModal('createClientModal');
-            refreshClients();
-            loadStats();
-            
-            // 清空表单
-            document.getElementById('clientPlayerName').value = '';
-            document.getElementById('clientMatchId').value = '';
-        } else {
-            showError('创建失败: ' + result.message);
-        }
-    } catch (error) {
-        showError('创建失败: ' + error.message);
-    }
-}
-
-// ========== LLM配置管理 ==========
-
-async function refreshLLMConfigs() {
-    try {
-        const response = await fetch(`${API_BASE}/llm-configs`);
-        const result = await response.json();
-        
-        if (result.code === 200) {
-            currentLLMConfigs = result.data;
-            renderLLMConfigsList();
-        } else {
-            showError('加载LLM配置失败: ' + result.message);
-        }
-    } catch (error) {
-        showError('加载LLM配置失败: ' + error.message);
-    }
-}
-
-function renderLLMConfigsList() {
-    const container = document.getElementById('llm-configs-list');
-    
-    const html = currentLLMConfigs.map(config => `
-        <div class="config-item">
-            <div>
-                <strong>${config.name}</strong><br>
-                <small>${config.endpoint}</small><br>
-                <small>模型: ${config.model || 'N/A'}</small>
+    const html = currentPlayers.map(player => `
+        <div class="list-item">
+            <h3>${escapeHtml(player.player_name)} ${player.status === 'active' ? '🟢' : '🔴'}</h3>
+            <div class="list-item-details">
+                <div class="detail-item">
+                    <span class="detail-label">玩家ID:</span> ${player.id}
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">AI客户端:</span> ${escapeHtml(player.client_name || '未知')}
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">状态:</span> ${player.status === 'active' ? '活跃' : '停用'}
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">创建时间:</span> ${formatDateTime(player.created_at)}
+                </div>
             </div>
-            <div>
-                <button class="btn" onclick="editLLMConfig('${config.id}')">编辑</button>
-                ${config.id !== 'default' ? `<button class="btn btn-danger" onclick="deleteLLMConfig('${config.id}')">删除</button>` : ''}
+            <div class="list-item-actions">
+                <button class="btn btn-small" onclick="togglePlayerStatus(${player.id})">${player.status === 'active' ? '停用' : '启用'}</button>
+                <button class="btn btn-small btn-danger" onclick="deletePlayer(${player.id})">删除</button>
             </div>
         </div>
     `).join('');
@@ -233,214 +349,192 @@ function renderLLMConfigsList() {
     container.innerHTML = html;
 }
 
-function loadLLMConfigOptions() {
-    const selects = ['clientLLMConfig', 'batchLLMConfig'];
+async function showCreatePlayerModal() {
+    await loadClientOptions();
+    document.getElementById('createPlayerModal').style.display = 'block';
+}
+
+async function loadClientOptions() {
+    const select = document.getElementById('playerAIClient');
+    select.innerHTML = '<option value="">请选择AI客户端</option>';
     
-    selects.forEach(selectId => {
-        const select = document.getElementById(selectId);
-        select.innerHTML = currentLLMConfigs.map(config => 
-            `<option value="${config.id}">${config.name}</option>`
-        ).join('');
+    currentClients.forEach(client => {
+        const option = document.createElement('option');
+        option.value = client.id;
+        option.textContent = `${client.name} (${client.supported_games.join(', ')})`;
+        select.appendChild(option);
     });
 }
 
-function showCreateLLMModal() {
-    document.getElementById('createLLMModal').style.display = 'block';
-}
-
-async function createLLMConfig() {
-    const config = {
-        name: document.getElementById('llmName').value,
-        endpoint: document.getElementById('llmEndpoint').value,
-        apiKey: document.getElementById('llmApiKey').value,
-        model: document.getElementById('llmModel').value,
-        maxTokens: parseInt(document.getElementById('llmMaxTokens').value),
-        temperature: parseFloat(document.getElementById('llmTemperature').value),
-        systemPrompt: document.getElementById('llmSystemPrompt').value
-    };
+async function createPlayer() {
+    const player_name = document.getElementById('playerName').value.trim();
+    const ai_client_id = document.getElementById('playerAIClient').value;
+    const status = document.getElementById('playerStatus').value;
     
-    if (!config.name || !config.endpoint) {
-        showError('请填写配置名称和API端点');
+    if (!player_name || !ai_client_id) {
+        alert('请填写玩家名称并选择AI客户端');
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE}/llm-configs`, {
+        const response = await fetch(`${API_BASE}/players`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                player_name,
+                ai_client_id,
+                status
+            })
         });
+        
         const result = await response.json();
         
         if (result.code === 200) {
-            showSuccess('LLM配置添加成功');
-            closeModal('createLLMModal');
-            refreshLLMConfigs();
+            closeModal('createPlayerModal');
+            refreshPlayers();
             loadStats();
-            
-            // 清空表单
-            document.getElementById('llmName').value = '';
-            document.getElementById('llmEndpoint').value = '';
-            document.getElementById('llmApiKey').value = '';
-            document.getElementById('llmModel').value = '';
-            document.getElementById('llmSystemPrompt').value = '';
+            clearPlayerForm();
+            showSuccess('players-list', 'AI玩家创建成功');
         } else {
-            showError('添加失败: ' + result.message);
+            alert('创建失败: ' + result.message);
         }
     } catch (error) {
-        showError('添加失败: ' + error.message);
+        console.error('创建AI玩家失败:', error);
+        alert('网络错误');
     }
 }
 
-async function deleteLLMConfig(configId) {
-    if (!confirm('确定要删除这个LLM配置吗？')) return;
+async function togglePlayerStatus(playerId) {
+    const player = currentPlayers.find(p => p.id === playerId);
+    if (!player) return;
+    
+    const newStatus = player.status === 'active' ? 'inactive' : 'active';
     
     try {
-        const response = await fetch(`${API_BASE}/llm-configs/${configId}`, {
+        const response = await fetch(`${API_BASE}/players/${playerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.code === 200) {
+            refreshPlayers();
+            loadStats();
+        } else {
+            alert('状态更新失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('更新玩家状态失败:', error);
+        alert('网络错误');
+    }
+}
+
+async function deletePlayer(playerId) {
+    if (!confirm('确定要删除这个AI玩家吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/players/${playerId}`, {
             method: 'DELETE'
         });
+        
         const result = await response.json();
         
         if (result.code === 200) {
-            showSuccess('LLM配置已删除');
-            refreshLLMConfigs();
+            refreshPlayers();
             loadStats();
+            showSuccess('players-list', 'AI玩家删除成功');
         } else {
-            showError('删除失败: ' + result.message);
+            alert('删除失败: ' + result.message);
         }
     } catch (error) {
-        showError('删除失败: ' + error.message);
+        console.error('删除AI玩家失败:', error);
+        alert('网络错误');
     }
 }
 
-// ========== 批量操作 ==========
+function clearPlayerForm() {
+    document.getElementById('playerName').value = '';
+    document.getElementById('playerAIClient').value = '';
+    document.getElementById('playerStatus').value = 'active';
+}
 
-async function createBatchClients() {
-    const count = parseInt(document.getElementById('batchCount').value);
-    const gameType = document.getElementById('batchGameType').value;
-    const aiType = document.getElementById('batchAIType').value;
-    const llmConfig = document.getElementById('batchLLMConfig').value;
+// ========== 游戏选择相关 ==========
+
+function renderGamesCheckboxes(containerId, selectedGames = []) {
+    const container = document.getElementById(containerId);
     
-    if (count < 1 || count > 10) {
-        showError('创建数量必须在1-10之间');
+    if (availableGames.length === 0) {
+        container.innerHTML = '<div class="loading">无可用游戏</div>';
         return;
     }
     
-    const configs = [];
-    for (let i = 1; i <= count; i++) {
-        configs.push({
-            playerName: `AI-${gameType}-${i}`,
-            gameType,
-            aiType,
-            llmConfig
-        });
-    }
+    const html = availableGames.map(game => `
+        <label class="game-checkbox">
+            <input type="checkbox" value="${game}" ${selectedGames.includes(game) ? 'checked' : ''}>
+            ${game}
+        </label>
+    `).join('');
     
-    try {
-        const response = await fetch(`${API_BASE}/clients/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ configs })
-        });
-        const result = await response.json();
-        
-        if (result.code === 200) {
-            const results = result.data;
-            const successCount = results.filter(r => r.success).length;
-            const failCount = results.filter(r => !r.success).length;
-            
-            let message = `批量创建完成: 成功 ${successCount} 个`;
-            if (failCount > 0) {
-                message += `, 失败 ${failCount} 个`;
-            }
-            
-            showSuccess(message);
-            
-            // 显示详细结果
-            const resultsHtml = results.map((result, index) => 
-                `<div class="${result.success ? 'success' : 'error'}">
-                    AI-${index + 1}: ${result.success ? '创建成功' : result.error}
-                </div>`
-            ).join('');
-            
-            document.getElementById('batch-results').innerHTML = resultsHtml;
-            
-            refreshClients();
-            loadStats();
-        } else {
-            showError('批量创建失败: ' + result.message);
-        }
-    } catch (error) {
-        showError('批量创建失败: ' + error.message);
-    }
+    container.innerHTML = html;
 }
 
-// ========== 工具函数 ==========
-
-function showTab(tabName) {
-    // 隐藏所有面板
-    document.querySelectorAll('.tab-panel').forEach(panel => {
-        panel.classList.remove('active');
-    });
-    
-    // 移除所有标签的active类
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    // 显示目标面板
-    document.getElementById(tabName + '-panel').classList.add('active');
-    
-    // 激活目标标签
-    event.target.classList.add('active');
+function getSelectedGames(containerId) {
+    const checkboxes = document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`);
+    return Array.from(checkboxes).map(cb => cb.value);
 }
+
+// ========== 模态框管理 ==========
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
 }
 
-function showError(message) {
-    // 简单的错误提示实现
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error';
-    errorDiv.textContent = message;
-    errorDiv.style.position = 'fixed';
-    errorDiv.style.top = '20px';
-    errorDiv.style.right = '20px';
-    errorDiv.style.zIndex = '9999';
-    errorDiv.style.maxWidth = '300px';
-    
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => {
-        document.body.removeChild(errorDiv);
-    }, 5000);
+// 点击模态框外部关闭
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
 }
 
-function showSuccess(message) {
-    // 简单的成功提示实现
+// ========== 工具函数 ==========
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return '未知';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN');
+}
+
+function showError(containerId, message) {
+    document.getElementById(containerId).innerHTML = `<div class="error">${message}</div>`;
+}
+
+function showSuccess(containerId, message) {
+    const container = document.getElementById(containerId);
     const successDiv = document.createElement('div');
     successDiv.className = 'success';
     successDiv.textContent = message;
-    successDiv.style.position = 'fixed';
-    successDiv.style.top = '20px';
-    successDiv.style.right = '20px';
-    successDiv.style.zIndex = '9999';
-    successDiv.style.maxWidth = '300px';
+    container.insertBefore(successDiv, container.firstChild);
     
-    document.body.appendChild(successDiv);
-    
+    // 3秒后自动移除成功消息
     setTimeout(() => {
-        document.body.removeChild(successDiv);
-    }, 3000);
-}
-
-// 模态框点击外部关闭
-window.onclick = function(event) {
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        if (event.target === modal) {
-            modal.style.display = 'none';
+        if (successDiv.parentNode) {
+            successDiv.parentNode.removeChild(successDiv);
         }
-    });
+    }, 3000);
 }

@@ -1,0 +1,29 @@
+{
+  "name": "llm-ai-service",
+  "version": "1.0.0",
+  "description": "基于LLM的AI游戏客户端服务 - 可作为外部AI开发的参考示例",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "ai", 
+    "llm", 
+    "boardgame", 
+    "demo"
+  ],
+  "author": "BoardGame Platform",
+  "license": "MIT"
+}

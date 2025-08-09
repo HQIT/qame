@@ -10,6 +10,7 @@ const aiRoutes = require('./routes/ai');
 const adminRoutes = require('./routes/admin');
 const adminAIRoutes = require('./routes/adminAI');
 const onlineRoutes = require('./routes/online');
+const playersRoutes = require('./routes/players'); // 新增：统一玩家管理
 
 const gameRoutes = require('./routes/games');
 const matchesRoutes = require('./routes/matches');
@@ -62,6 +63,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', adminAIRoutes);
 app.use('/api/online', onlineRoutes);
+app.use('/api/players', playersRoutes); // 新增：统一玩家管理API
 
 app.use('/api/games', gameRoutes);
 app.use('/api/matches', matchesRoutes);

@@ -79,7 +79,27 @@ export const api = {
   deleteUser: (userId) => apiCall(`/api/admin/users/${userId}`, { method: 'DELETE' }),
   getStats: () => apiCall('/api/admin/stats'),
 
-  // AI相关
+  // AI相关（新架构）
+  getAIClients: () => apiCall('/ai-manager/api/clients'),
+  getAIPlayers: () => apiCall('/ai-manager/api/players'),
+  getActiveAIPlayers: () => apiCall('/ai-manager/api/players/active'),
+  createAIClient: (clientData) => apiCall('/ai-manager/api/clients', {
+    method: 'POST',
+    body: JSON.stringify(clientData)
+  }),
+  createAIPlayer: (playerData) => apiCall('/ai-manager/api/players', {
+    method: 'POST',
+    body: JSON.stringify(playerData)
+  }),
+  updateAIClient: (clientId, clientData) => apiCall(`/ai-manager/api/clients/${clientId}`, {
+    method: 'PUT',
+    body: JSON.stringify(clientData)
+  }),
+  deleteAIClient: (clientId) => apiCall(`/ai-manager/api/clients/${clientId}`, { method: 'DELETE' }),
+  deleteAIPlayer: (playerId) => apiCall(`/ai-manager/api/players/${playerId}`, { method: 'DELETE' }),
+  getAvailableGames: () => apiCall('/games/api/games'),
+  
+  // AI相关（兼容旧接口）
   getAITypes: (gameId) => apiCall(`/api/ai/types${gameId ? `?gameId=${gameId}` : ''}`),
   callAI: (aiTypeId, gameState, config) => apiCall('/api/ai/move', {
     method: 'POST',

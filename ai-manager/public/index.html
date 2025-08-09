@@ -55,35 +55,45 @@
             font-size: 2em;
             font-weight: bold;
             color: #3498db;
+            margin-bottom: 5px;
         }
         
         .tabs {
             display: flex;
             background: white;
-            border-radius: 8px 8px 0 0;
+            border-radius: 8px;
+            overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         
         .tab {
             flex: 1;
-            padding: 15px;
+            padding: 15px 20px;
             text-align: center;
             cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
+            transition: background-color 0.3s;
+            border-right: 1px solid #eee;
+        }
+        
+        .tab:last-child {
+            border-right: none;
         }
         
         .tab.active {
-            border-bottom-color: #3498db;
+            background: #3498db;
+            color: white;
+        }
+        
+        .tab:hover:not(.active) {
             background: #f8f9fa;
         }
         
         .tab-content {
             background: white;
-            padding: 20px;
-            border-radius: 0 0 8px 8px;
+            border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-height: 400px;
+            padding: 20px;
         }
         
         .tab-panel {
@@ -101,11 +111,20 @@
             padding: 10px 20px;
             border-radius: 4px;
             cursor: pointer;
-            margin: 5px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
         }
         
         .btn:hover {
             background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+        }
+        
+        .btn-success:hover {
+            background: #229954;
         }
         
         .btn-danger {
@@ -116,12 +135,76 @@
             background: #c0392b;
         }
         
-        .btn-success {
-            background: #27ae60;
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
         }
         
-        .btn-success:hover {
-            background: #229954;
+        .list-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+        
+        .list-item h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .list-item-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .detail-item {
+            font-size: 14px;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .list-item-actions {
+            text-align: right;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
         }
         
         .form-group {
@@ -138,77 +221,21 @@
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 8px;
+            padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 14px;
         }
         
-        .client-list {
-            display: grid;
-            gap: 15px;
-        }
-        
-        .client-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            background: #f9f9f9;
-        }
-        
-        .client-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .client-status {
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: white;
-            font-size: 0.8em;
-        }
-        
-        .status-running { background: #27ae60; }
-        .status-stopped { background: #95a5a6; }
-        .status-crashed { background: #e74c3c; }
-        .status-starting { background: #f39c12; }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-        }
-        
-        .modal-content {
-            background: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 600px;
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover {
-            color: #000;
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
         }
         
         .loading {
             text-align: center;
             padding: 20px;
+            color: #666;
         }
         
         .error {
@@ -227,18 +254,22 @@
             margin: 10px 0;
         }
         
-        .config-list {
-            display: grid;
-            gap: 10px;
-        }
-        
-        .config-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
+        .games-list {
             border: 1px solid #ddd;
             border-radius: 4px;
+            padding: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        
+        .game-checkbox {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .game-checkbox input {
+            width: auto;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -246,189 +277,155 @@
     <div class="container">
         <div class="header">
             <h1>🤖 AI玩家管理中心</h1>
-            <p>管理和监控AI客户端、LLM配置和游戏参与</p>
+            <p>管理AI客户端服务注册和AI玩家身份</p>
         </div>
         
         <div class="stats" id="stats">
             <div class="stat-card">
                 <div class="stat-number" id="totalClients">0</div>
-                <div>总AI客户端</div>
+                <div>AI客户端</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="runningClients">0</div>
-                <div>运行中</div>
+                <div class="stat-number" id="totalPlayers">0</div>
+                <div>AI玩家</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="llmConfigs">0</div>
-                <div>LLM配置</div>
+                <div class="stat-number" id="activePlayers">0</div>
+                <div>活跃玩家</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="aiTypes">0</div>
-                <div>AI类型</div>
+                <div class="stat-number" id="supportedGames">0</div>
+                <div>支持游戏</div>
             </div>
         </div>
         
         <div class="tabs">
             <div class="tab active" onclick="showTab('clients')">AI客户端管理</div>
-            <div class="tab" onclick="showTab('llm')">LLM配置</div>
-            <div class="tab" onclick="showTab('batch')">批量操作</div>
+            <div class="tab" onclick="showTab('players')">AI玩家管理</div>
         </div>
         
         <div class="tab-content">
             <!-- AI客户端管理 -->
             <div class="tab-panel active" id="clients-panel">
                 <div style="margin-bottom: 20px;">
-                    <button class="btn btn-success" onclick="showCreateClientModal()">创建AI客户端</button>
-                    <button class="btn btn-danger" onclick="stopAllClients()">停止所有客户端</button>
+                    <button class="btn btn-success" onclick="showCreateClientModal()">注册AI客户端</button>
                     <button class="btn" onclick="refreshClients()">刷新</button>
                 </div>
-                <div id="clients-list" class="client-list">
+                <div id="clients-list">
                     <div class="loading">加载中...</div>
                 </div>
             </div>
             
-            <!-- LLM配置管理 -->
-            <div class="tab-panel" id="llm-panel">
+            <!-- AI玩家管理 -->
+            <div class="tab-panel" id="players-panel">
                 <div style="margin-bottom: 20px;">
-                    <button class="btn btn-success" onclick="showCreateLLMModal()">添加LLM配置</button>
-                    <button class="btn" onclick="refreshLLMConfigs()">刷新</button>
+                    <button class="btn btn-success" onclick="showCreatePlayerModal()">创建AI玩家</button>
+                    <button class="btn" onclick="refreshPlayers()">刷新</button>
                 </div>
-                <div id="llm-configs-list" class="config-list">
+                <div id="players-list">
                     <div class="loading">加载中...</div>
                 </div>
-            </div>
-            
-            <!-- 批量操作 -->
-            <div class="tab-panel" id="batch-panel">
-                <div style="margin-bottom: 20px;">
-                    <h3>批量创建AI玩家</h3>
-                    <p>快速创建多个AI客户端用于测试或游戏</p>
-                </div>
-                
-                <div class="form-group">
-                    <label>创建数量:</label>
-                    <input type="number" id="batchCount" value="3" min="1" max="10">
-                </div>
-                
-                <div class="form-group">
-                    <label>游戏类型:</label>
-                    <select id="batchGameType">
-                        <option value="tic-tac-toe">井字棋</option>
-                        <option value="connect-four">四子棋</option>
-                        <option value="checkers">跳棋</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>AI类型:</label>
-                    <select id="batchAIType">
-                        <option value="basic">基础AI</option>
-                        <option value="strategic">策略AI</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>LLM配置:</label>
-                    <select id="batchLLMConfig">
-                        <option value="default">默认配置</option>
-                    </select>
-                </div>
-                
-                <button class="btn btn-success" onclick="createBatchClients()">批量创建</button>
-                
-                <div id="batch-results" style="margin-top: 20px;"></div>
             </div>
         </div>
     </div>
     
-    <!-- 创建AI客户端模态框 -->
+    <!-- 注册AI客户端模态框 -->
     <div id="createClientModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('createClientModal')">&times;</span>
-            <h2>创建AI客户端</h2>
+            <h2>注册AI客户端</h2>
             
             <div class="form-group">
-                <label>玩家名称:</label>
-                <input type="text" id="clientPlayerName" placeholder="AI-Player-1">
+                <label>客户端名称:</label>
+                <input type="text" id="clientName" placeholder="我的AI客户端" required>
             </div>
             
             <div class="form-group">
-                <label>游戏ID (可选):</label>
-                <input type="text" id="clientMatchId" placeholder="留空则连接到大厅">
+                <label>Qame接入地址:</label>
+                <input type="text" id="clientEndpoint" placeholder="http://localhost:3003/move" required>
+                <small style="color: #666; font-size: 12px;">AI客户端的标准/move接口地址</small>
             </div>
             
             <div class="form-group">
-                <label>游戏类型:</label>
-                <select id="clientGameType">
-                    <option value="tic-tac-toe">井字棋</option>
-                    <option value="connect-four">四子棋</option>
-                    <option value="checkers">跳棋</option>
-                </select>
+                <label>支持的游戏:</label>
+                <div id="clientSupportedGames" class="games-list">
+                    <div class="loading">加载游戏列表...</div>
+                </div>
             </div>
             
             <div class="form-group">
-                <label>AI类型:</label>
-                <select id="clientAIType">
-                    <option value="basic">基础AI</option>
-                    <option value="strategic">策略AI</option>
-                </select>
+                <label>描述信息:</label>
+                <textarea id="clientDescription" placeholder="AI客户端描述，可包含团队信息、技术栈等..."></textarea>
             </div>
             
-            <div class="form-group">
-                <label>LLM配置:</label>
-                <select id="clientLLMConfig">
-                    <option value="default">默认配置</option>
-                </select>
-            </div>
-            
-            <button class="btn btn-success" onclick="createClient()">创建</button>
+            <button class="btn btn-success" onclick="createClient()">注册</button>
             <button class="btn" onclick="closeModal('createClientModal')">取消</button>
         </div>
     </div>
     
-    <!-- 创建LLM配置模态框 -->
-    <div id="createLLMModal" class="modal">
+    <!-- 创建AI玩家模态框 -->
+    <div id="createPlayerModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal('createLLMModal')">&times;</span>
-            <h2>添加LLM配置</h2>
+            <span class="close" onclick="closeModal('createPlayerModal')">&times;</span>
+            <h2>创建AI玩家</h2>
             
             <div class="form-group">
-                <label>配置名称:</label>
-                <input type="text" id="llmName" placeholder="我的LLM配置">
+                <label>玩家名称:</label>
+                <input type="text" id="playerName" placeholder="AI-Player-1" required>
             </div>
             
             <div class="form-group">
-                <label>API端点:</label>
-                <input type="text" id="llmEndpoint" placeholder="http://localhost:3001/api/move">
+                <label>选择AI客户端:</label>
+                <select id="playerAIClient" required>
+                    <option value="">请选择AI客户端</option>
+                </select>
             </div>
             
             <div class="form-group">
-                <label>API密钥:</label>
-                <input type="password" id="llmApiKey" placeholder="sk-...">
+                <label>状态:</label>
+                <select id="playerStatus">
+                    <option value="active">活跃</option>
+                    <option value="inactive">停用</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-success" onclick="createPlayer()">创建</button>
+            <button class="btn" onclick="closeModal('createPlayerModal')">取消</button>
+        </div>
+    </div>
+    
+    <!-- 编辑AI客户端模态框 -->
+    <div id="editClientModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editClientModal')">&times;</span>
+            <h2>编辑AI客户端</h2>
+            
+            <input type="hidden" id="editClientId">
+            
+            <div class="form-group">
+                <label>客户端名称:</label>
+                <input type="text" id="editClientName" required>
             </div>
             
             <div class="form-group">
-                <label>模型名称:</label>
-                <input type="text" id="llmModel" placeholder="gpt-3.5-turbo">
+                <label>Qame接入地址:</label>
+                <input type="text" id="editClientEndpoint" required>
             </div>
             
             <div class="form-group">
-                <label>最大Token数:</label>
-                <input type="number" id="llmMaxTokens" value="100" min="10" max="1000">
+                <label>支持的游戏:</label>
+                <div id="editClientSupportedGames" class="games-list">
+                    <div class="loading">加载游戏列表...</div>
+                </div>
             </div>
             
             <div class="form-group">
-                <label>温度参数:</label>
-                <input type="number" id="llmTemperature" value="0.7" min="0" max="2" step="0.1">
+                <label>描述信息:</label>
+                <textarea id="editClientDescription"></textarea>
             </div>
             
-            <div class="form-group">
-                <label>系统提示词:</label>
-                <textarea id="llmSystemPrompt" rows="3" placeholder="你是一个聪明的游戏AI助手..."></textarea>
-            </div>
-            
-            <button class="btn btn-success" onclick="createLLMConfig()">添加</button>
-            <button class="btn" onclick="closeModal('createLLMModal')">取消</button>
+            <button class="btn btn-success" onclick="updateClient()">更新</button>
+            <button class="btn" onclick="closeModal('editClientModal')">取消</button>
         </div>
     </div>
 

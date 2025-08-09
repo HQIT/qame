@@ -49,6 +49,7 @@ services:
       - DB_USER=boardgame_user
       - DB_PASSWORD=boardgame_pass
       - DB_PORT=5432
+
     depends_on:
       - postgres
     networks:
@@ -71,6 +72,7 @@ services:
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRES_IN=4h  # 4小时过期，通过心跳自动续期
       - ADMIN_PASSWORD=admin123
     depends_on:
       - postgres

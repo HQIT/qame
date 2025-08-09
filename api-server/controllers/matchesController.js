@@ -166,7 +166,7 @@ exports.createMatch = async (req, res) => {
 exports.addPlayer = async (req, res) => {
   try {
     const { matchId } = req.params;
-    const { playerType, playerId, playerName, seatIndex, aiConfig = {} } = req.body;
+    const { playerType, playerId, playerName, seatIndex, aiPlayerId } = req.body;
     if (!playerType || !['human', 'ai'].includes(playerType)) return badRequest(res, '玩家类型必须是human或ai');
 
     const match = await Match.findById(matchId);
@@ -187,9 +187,9 @@ exports.addPlayer = async (req, res) => {
       if (active.length > 0) return badRequest(res, `您已经在另一个match中（ID: ${active[0].match_id.substring(0, 8)}...），请先离开该match再加入新的match`);
     } else if (playerType === 'ai') {
       if (!isCreator) return forbidden(res, '只有创建者可以添加AI玩家');
-      if (!(aiConfig && aiConfig.clientId)) return badRequest(res, 'AI玩家必须提供aiConfig.clientId');
-      if (!aiConfig.playerName) return badRequest(res, 'AI玩家必须提供aiConfig.playerName');
-      // 预设AI类型已移除；不再校验/复用 ai_type_id
+      if (!aiPlayerId) return badRequest(res, 'AI玩家必须提供aiPlayerId');
+      if (!playerName) return badRequest(res, 'AI玩家必须提供playerName');
+      // AI玩家信息通过aiPlayerId从ai-manager获取
     }
 
     if (targetSeatIndex === undefined || targetSeatIndex === null) {
@@ -202,29 +202,25 @@ exports.addPlayer = async (req, res) => {
       }
     }
 
-    // 统一 player_name：
-    // - human: 使用传入的 playerName 或当前用户名
-    // - ai: 优先使用 aiConfig.playerName（AI 客户端展示名）；否则使用精简格式 `AI-<clientId前6位>`
-    const resolvedPlayerName =
-      playerType === 'human'
-        ? (playerName || req.user.username)
-        : aiConfig?.playerName;
+    // 统一 player_name：前端已传递正确的playerName
+    const resolvedPlayerName = playerName || (playerType === 'human' ? req.user.username : 'AI Player');
 
     const playerData = {
       matchId,
       seatIndex: targetSeatIndex,
       playerType,
       playerName: resolvedPlayerName,
-      aiConfig,
     };
-    if (playerType === 'human') playerData.userId = req.user.id;
+    
+    if (playerType === 'human') {
+      playerData.userId = req.user.id;
+    } else if (playerType === 'ai') {
+      playerData.aiPlayerId = aiPlayerId;
+    }
     // AI不再写入 aiTypeId
 
     const player = await MatchPlayer.addPlayer(playerData);
-    // 若为AI，写回 ai_clients 绑定
-    if (playerType === 'ai' && aiConfig?.clientId) {
-      try { await AiClient.assignToMatch(aiConfig.clientId, matchId, targetSeatIndex); } catch (_) {}
-    }
+    // AI玩家信息已通过aiPlayerId在unified players表中管理，无需额外绑定
 
     try {
       const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
@@ -279,6 +275,13 @@ exports.addPlayer = async (req, res) => {
 
     const canStart = await Match.canStart(matchId);
     if (canStart && match.auto_start) await Match.updateStatus(matchId, 'playing', req.user.id, '自动开始游戏');
+    // 主动标记为 playing 的同时，尝试触发一次 AI 检查
+    try {
+      const aiPing = await fetch(`${process.env.GAME_SERVER_URL || 'http://game-server:8000'}/ai/ping`, {
+        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || 'internal-service-secret-key-2024' }
+      });
+      await aiPing.text();
+    } catch (_) {}
 
     const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
     return res.status(201).json({ code: 200, message: '玩家添加成功', data: { ...player.getDisplayInfo(), bgioMatchId } });
@@ -410,7 +413,10 @@ exports.forceLeavePlayer = async (req, res) => {
       // 不影响主要操作，继续执行
     }
 
-    console.log(`🔨 管理员 ${req.user.username} 强制用户 ${userId} 离开游戏 ${matchId}`);
+    const targetInfo = player.user_id 
+      ? `用户ID ${player.user_id}` 
+      : `AI ${player.player_name || `seat ${player.seat_index}`}`;
+    console.log(`🔨 管理员 ${req.user.username} 强制 ${targetInfo} 离开游戏 ${matchId}`);
     
     return res.json({
       code: 200,

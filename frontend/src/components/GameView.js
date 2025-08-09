@@ -77,37 +77,17 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
       return null;
     }
 
-    // 如果已经创建过客户端，直接返回
-    if (clientRef.current) {
-      console.log('🔄 使用已存在的boardgame.io客户端');
-      return clientRef.current;
-    }
-
     try {
-      const setupData = {
-        matchId: matchID,
-        aiConfig: matchInfo?.aiConfig || null
-      };
-
       console.log('🔌 创建boardgame.io客户端:', {
         server: window.location.origin,
         gameServer: window.location.origin,
-        matchID,
-        playerID,
-        playerName,
-        credentials: playerCredentials ? '***已获取***' : '未获取',
-        setupData
+        willPassPropsAtRender: true
       });
 
-      const client = Client({
+      const ClientComponent = Client({
         game: TicTacToe,
-        board: TicTacToeBoard,
+        board: (props) => <TicTacToeBoard {...props} matchInfo={matchInfo} />,
         debug: false, // 关闭debug模式以减少日志输出
-        matchID,
-        playerID,
-        playerName,
-        credentials: playerCredentials,
-        setupData,
         multiplayer: SocketIO({ 
           server: window.location.origin
         }),
@@ -139,9 +119,7 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
         }
       });
 
-      // 保存客户端引用
-      clientRef.current = client;
-      return client;
+      return ClientComponent;
     } catch (error) {
       console.error('❌ 创建GameClient失败:', error);
       setGameClientError(`客户端创建失败: ${error.message}`);
@@ -251,7 +229,14 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
           )}
         </div>
         
-        {GameClient && <GameClient />}
+        {GameClient && (
+          <GameClient 
+            matchID={matchID}
+            playerID={playerID}
+            playerName={playerName}
+            credentials={playerCredentials}
+          />
+        )}
         
         <div style={{ marginTop: '20px', textAlign: 'center' }}>
           <button

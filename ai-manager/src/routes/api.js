@@ -1,23 +1,19 @@
 const express = require('express');
 const router = express.Router();
-
-// 获取AI管理器实例
-function getAIManager(req) {
-  return req.app.locals.aiManager;
-}
+const AIClientModel = require('../models/AIClient');
+const AIPlayerModel = require('../models/AIPlayer');
 
 // 响应格式化
 function formatResponse(code, message, data = null) {
   return { code, message, data };
 }
 
-// ========== AI客户端管理 ==========
+// ========== AI客户端管理（服务注册） ==========
 
 // 获取所有AI客户端
 router.get('/clients', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const clients = await aiManager.getAllClients();
+    const clients = await AIClientModel.getAll();
     res.json(formatResponse(200, '获取成功', clients));
   } catch (error) {
     res.status(500).json(formatResponse(500, '获取失败', error.message));
@@ -25,10 +21,9 @@ router.get('/clients', async (req, res) => {
 });
 
 // 获取单个AI客户端详情
-router.get('/clients/:clientId', (req, res) => {
+router.get('/clients/:clientId', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const client = aiManager.getClient(req.params.clientId);
+    const client = await AIClientModel.getById(req.params.clientId);
     
     if (!client) {
       return res.status(404).json(formatResponse(404, 'AI客户端不存在'));
@@ -43,294 +38,214 @@ router.get('/clients/:clientId', (req, res) => {
 // 创建AI客户端
 router.post('/clients', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const config = req.body;
+    const { name, endpoint, supported_games, description } = req.body;
     
     // 验证必要参数
-    if (!config.playerName) {
-      return res.status(400).json(formatResponse(400, '缺少玩家名称'));
+    if (!name || !endpoint) {
+      return res.status(400).json(formatResponse(400, '缺少必要参数：name、endpoint'));
     }
     
-    const client = await aiManager.createClient(config);
+    if (!supported_games || !Array.isArray(supported_games) || supported_games.length === 0) {
+      return res.status(400).json(formatResponse(400, '必须指定至少一个支持的游戏'));
+    }
+    
+    // 生成客户端ID
+    const clientId = `ai-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const clientData = {
+      id: clientId,
+      name,
+      endpoint,
+      supported_games,
+      description: description || ''
+    };
+    
+    const client = await AIClientModel.create(clientData);
     res.json(formatResponse(200, '创建成功', client));
   } catch (error) {
     res.status(500).json(formatResponse(500, '创建失败', error.message));
   }
 });
 
-// 停止AI客户端
+// 更新AI客户端
+router.put('/clients/:clientId', async (req, res) => {
+  try {
+    const { name, endpoint, supported_games, description } = req.body;
+    
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (endpoint !== undefined) updateData.endpoint = endpoint;
+    if (supported_games !== undefined) updateData.supported_games = supported_games;
+    if (description !== undefined) updateData.description = description;
+    
+    const client = await AIClientModel.update(req.params.clientId, updateData);
+    
+    if (!client) {
+      return res.status(404).json(formatResponse(404, 'AI客户端不存在'));
+    }
+    
+    res.json(formatResponse(200, '更新成功', client));
+  } catch (error) {
+    res.status(500).json(formatResponse(500, '更新失败', error.message));
+  }
+});
+
+// 删除AI客户端
 router.delete('/clients/:clientId', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    await aiManager.stopClient(req.params.clientId);
-    res.json(formatResponse(200, '停止成功'));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '停止失败', error.message));
-  }
-});
-
-// 重新连接AI客户端
-router.post('/clients/:clientId/reconnect', async (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const client = await aiManager.reconnectClient(req.params.clientId);
-    res.json(formatResponse(200, '重新连接成功', client));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '重新连接失败', error.message));
-  }
-});
-
-// 停止所有AI客户端
-router.delete('/clients', async (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    await aiManager.stopAllClients();
-    res.json(formatResponse(200, '全部停止成功'));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '全部停止失败', error.message));
-  }
-});
-
-// 将AI客户端分配到指定match
-router.post('/clients/:clientId/assign', async (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const { clientId } = req.params;
-    const { matchId, gameType } = req.body;
-
-    if (!matchId) {
-      return res.status(400).json(formatResponse(400, '缺少matchId'));
-    }
-
-    const result = await aiManager.assignClientToMatch(clientId, matchId, gameType);
-    res.json(formatResponse(200, '分配成功', result));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '分配失败', error.message));
-  }
-});
-
-// ========== AI配置管理 (合并LLM配置+AI类型+AI提供商) ==========
-
-// 获取所有AI配置
-router.get('/ai-configs', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const configs = aiManager.getAIConfigs();
-    res.json(formatResponse(200, '获取成功', configs));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '获取失败', error.message));
-  }
-});
-
-// 获取单个AI配置
-router.get('/ai-configs/:configId', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const config = aiManager.getAIConfig(req.params.configId);
+    const client = await AIClientModel.delete(req.params.clientId);
     
-    if (!config) {
-      return res.status(404).json(formatResponse(404, 'AI配置不存在'));
+    if (!client) {
+      return res.status(404).json(formatResponse(404, 'AI客户端不存在'));
     }
     
-    res.json(formatResponse(200, '获取成功', config));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '获取失败', error.message));
-  }
-});
-
-// 创建AI配置
-router.post('/ai-configs', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const config = req.body;
-    
-    // 验证必要参数
-    if (!config.name || !config.endpoint) {
-      return res.status(400).json(formatResponse(400, '缺少必要参数：name和endpoint'));
-    }
-    
-    if (!config.supportedGames || !Array.isArray(config.supportedGames) || config.supportedGames.length === 0) {
-      return res.status(400).json(formatResponse(400, '必须指定至少一个支持的游戏'));
-    }
-    
-    const configId = aiManager.addAIConfig(config);
-    res.json(formatResponse(200, '创建成功', { id: configId }));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '创建失败', error.message));
-  }
-});
-
-// 更新AI配置
-router.put('/ai-configs/:configId', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const updatedConfig = aiManager.updateAIConfig(req.params.configId, req.body);
-    res.json(formatResponse(200, '更新成功', updatedConfig));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '更新失败', error.message));
-  }
-});
-
-// 删除AI配置
-router.delete('/ai-configs/:configId', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const success = aiManager.deleteAIConfig(req.params.configId);
-    
-    if (success) {
-      res.json(formatResponse(200, '删除成功'));
-    } else {
-      res.status(404).json(formatResponse(404, 'AI配置不存在'));
-    }
+    res.json(formatResponse(200, '删除成功'));
   } catch (error) {
     res.status(500).json(formatResponse(500, '删除失败', error.message));
   }
 });
 
-// ========== 向后兼容的LLM配置API ==========
+// ========== AI玩家管理（玩家身份） ==========
 
-// 获取所有LLM配置 (兼容性API)
-router.get('/llm-configs', (req, res) => {
+// 获取所有AI玩家
+router.get('/players', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const configs = aiManager.getAIConfigs(); // 使用新的AI配置方法
-    // 转换为旧格式
-    const llmConfigs = configs.map(config => ({
-      id: config.id,
-      name: config.name,
-      description: config.description,
-      endpoint: config.endpoint,
-      apiKey: config.apiKey,
-      model: config.model,
-      maxTokens: config.maxTokens,
-      temperature: config.temperature,
-      systemPrompt: config.systemPrompt
-    }));
-    res.json(formatResponse(200, '获取成功', llmConfigs));
+    const players = await AIPlayerModel.getAll();
+    res.json(formatResponse(200, '获取成功', players));
   } catch (error) {
     res.status(500).json(formatResponse(500, '获取失败', error.message));
   }
 });
 
-// 创建LLM配置 (兼容性API)
-router.post('/llm-configs', (req, res) => {
+// 获取活跃的AI玩家（必须在参数路由之前）
+router.get('/players/active', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const config = req.body;
+    const players = await AIPlayerModel.getActive();
+    res.json(formatResponse(200, '获取成功', players));
+  } catch (error) {
+    res.status(500).json(formatResponse(500, '获取失败', error.message));
+  }
+});
+
+// 获取单个AI玩家详情
+router.get('/players/:playerId', async (req, res) => {
+  try {
+    const player = await AIPlayerModel.getById(req.params.playerId);
+    
+    if (!player) {
+      return res.status(404).json(formatResponse(404, 'AI玩家不存在'));
+    }
+    
+    res.json(formatResponse(200, '获取成功', player));
+  } catch (error) {
+    res.status(500).json(formatResponse(500, '获取失败', error.message));
+  }
+});
+
+// 根据AI客户端ID获取玩家
+router.get('/clients/:clientId/players', async (req, res) => {
+  try {
+    const players = await AIPlayerModel.getByClientId(req.params.clientId);
+    res.json(formatResponse(200, '获取成功', players));
+  } catch (error) {
+    res.status(500).json(formatResponse(500, '获取失败', error.message));
+  }
+});
+
+// 创建AI玩家
+router.post('/players', async (req, res) => {
+  try {
+    const { player_name, ai_client_id } = req.body;
     
     // 验证必要参数
-    if (!config.name || !config.endpoint) {
-      return res.status(400).json(formatResponse(400, '缺少必要参数'));
+    if (!player_name || !ai_client_id) {
+      return res.status(400).json(formatResponse(400, '缺少必要参数：player_name、ai_client_id'));
     }
     
-    // 转换为新的AI配置格式
-    const aiConfig = {
-      name: config.name,
-      description: config.description || '通过LLM配置API创建',
-      type: 'custom',
-      endpoint: config.endpoint,
-      apiKey: config.apiKey,
-      model: config.model || 'gpt-3.5-turbo',
-      maxTokens: config.maxTokens || 100,
-      temperature: config.temperature || 0.7,
-      systemPrompt: config.systemPrompt || '你是一个聪明的游戏AI助手。',
-      supportedGames: ['tic-tac-toe'], // 默认值
-      maxComplexity: 'medium',
-      maxPlayers: 4,
-      maxBoardSize: 100,
-      features: {
-        strategicThinking: true,
-        patternRecognition: true,
-        longTermPlanning: false,
-        realTimeDecision: true
-      },
-      minThinkTime: 1000,
-      maxThinkTime: 3000,
-      useFallback: true,
-      validateMoves: true
-    };
-    
-    const configId = aiManager.addAIConfig(aiConfig);
-    res.json(formatResponse(200, '创建成功', { id: configId }));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '创建失败', error.message));
-  }
-});
-
-// 更新LLM配置 (兼容性API)
-router.put('/llm-configs/:configId', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    
-    // 获取现有配置
-    const existingConfig = aiManager.getAIConfig(req.params.configId);
-    if (!existingConfig) {
-      return res.status(404).json(formatResponse(404, 'LLM配置不存在'));
+    // 验证AI客户端是否存在
+    const aiClient = await AIClientModel.getById(ai_client_id);
+    if (!aiClient) {
+      return res.status(400).json(formatResponse(400, '指定的AI客户端不存在'));
     }
     
-    // 只更新LLM相关字段
-    const updateData = {
-      name: req.body.name,
-      description: req.body.description,
-      endpoint: req.body.endpoint,
-      apiKey: req.body.apiKey,
-      model: req.body.model,
-      maxTokens: req.body.maxTokens,
-      temperature: req.body.temperature,
-      systemPrompt: req.body.systemPrompt
+    const playerData = {
+      player_name,
+      ai_client_id,
+      status: 'active'
     };
     
-    const updatedConfig = aiManager.updateAIConfig(req.params.configId, updateData);
-    res.json(formatResponse(200, '更新成功', updatedConfig));
+    const player = await AIPlayerModel.create(playerData);
+    res.json(formatResponse(200, '创建成功', player));
   } catch (error) {
-    res.status(500).json(formatResponse(500, '更新失败', error.message));
-  }
-});
-
-// 删除LLM配置 (兼容性API)
-router.delete('/llm-configs/:configId', (req, res) => {
-  try {
-    const aiManager = getAIManager(req);
-    const success = aiManager.deleteAIConfig(req.params.configId);
-    
-    if (success) {
-      res.json(formatResponse(200, '删除成功'));
+    if (error.code === '23505') { // 唯一约束违反
+      res.status(400).json(formatResponse(400, '玩家名称已存在'));
     } else {
-      res.status(404).json(formatResponse(404, 'LLM配置不存在'));
+      res.status(500).json(formatResponse(500, '创建失败', error.message));
     }
+  }
+});
+
+// 更新AI玩家
+router.put('/players/:playerId', async (req, res) => {
+  try {
+    const { player_name, status } = req.body;
+    
+    const updateData = {};
+    if (player_name !== undefined) updateData.player_name = player_name;
+    if (status !== undefined) updateData.status = status;
+    
+    const player = await AIPlayerModel.update(req.params.playerId, updateData);
+    
+    if (!player) {
+      return res.status(404).json(formatResponse(404, 'AI玩家不存在'));
+    }
+    
+    res.json(formatResponse(200, '更新成功', player));
+  } catch (error) {
+    if (error.code === '23505') { // 唯一约束违反
+      res.status(400).json(formatResponse(400, '玩家名称已存在'));
+    } else {
+      res.status(500).json(formatResponse(500, '更新失败', error.message));
+    }
+  }
+});
+
+// 删除AI玩家
+router.delete('/players/:playerId', async (req, res) => {
+  try {
+    const player = await AIPlayerModel.delete(req.params.playerId);
+    
+    if (!player) {
+      return res.status(404).json(formatResponse(404, 'AI玩家不存在'));
+    }
+    
+    res.json(formatResponse(200, '删除成功'));
   } catch (error) {
     res.status(500).json(formatResponse(500, '删除失败', error.message));
   }
 });
 
-// ========== AI类型管理 ==========
+// ========== 游戏支持检查 ==========
 
-// 获取所有AI类型
-router.get('/ai-types', (req, res) => {
+// 检查AI客户端是否支持指定游戏
+router.get('/clients/:clientId/supports/:gameType', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const types = aiManager.getAITypes();
-    res.json(formatResponse(200, '获取成功', types));
+    const { clientId, gameType } = req.params;
+    const supports = await AIClientModel.supportsGame(clientId, gameType);
+    res.json(formatResponse(200, '检查成功', { supports }));
   } catch (error) {
-    res.status(500).json(formatResponse(500, '获取失败', error.message));
+    res.status(500).json(formatResponse(500, '检查失败', error.message));
   }
 });
 
-// 创建AI类型
-router.post('/ai-types', (req, res) => {
+// 检查AI玩家是否支持指定游戏
+router.get('/players/:playerId/supports/:gameType', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const aiType = req.body;
-    
-    // 验证必要参数
-    if (!aiType.name || !aiType.supportedGames) {
-      return res.status(400).json(formatResponse(400, '缺少必要参数'));
-    }
-    
-    const typeId = aiManager.addAIType(aiType);
-    res.json(formatResponse(200, '创建成功', { id: typeId }));
+    const { playerId, gameType } = req.params;
+    const supports = await AIPlayerModel.supportsGame(playerId, gameType);
+    res.json(formatResponse(200, '检查成功', { supports }));
   } catch (error) {
-    res.status(500).json(formatResponse(500, '创建失败', error.message));
+    res.status(500).json(formatResponse(500, '检查失败', error.message));
   }
 });
 
@@ -339,8 +254,34 @@ router.post('/ai-types', (req, res) => {
 // 获取统计信息
 router.get('/stats', async (req, res) => {
   try {
-    const aiManager = getAIManager(req);
-    const stats = await aiManager.getStats();
+    const [clients, players, activePlayers] = await Promise.all([
+      AIClientModel.getAll(),
+      AIPlayerModel.getAll(),
+      AIPlayerModel.getActive()
+    ]);
+    
+    const stats = {
+      clients: {
+        total: clients.length,
+        by_games: {}
+      },
+      players: {
+        total: players.length,
+        active: activePlayers.length,
+        inactive: players.length - activePlayers.length
+      }
+    };
+    
+    // 统计每个游戏的支持情况
+    clients.forEach(client => {
+      client.supported_games.forEach(game => {
+        if (!stats.clients.by_games[game]) {
+          stats.clients.by_games[game] = 0;
+        }
+        stats.clients.by_games[game]++;
+      });
+    });
+    
     res.json(formatResponse(200, '获取成功', stats));
   } catch (error) {
     res.status(500).json(formatResponse(500, '获取失败', error.message));

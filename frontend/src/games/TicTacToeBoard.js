@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import AIBot from '../components/AIBot';
-import LLMBot from '../components/LLMBot';
 
 /**
  * 井字棋游戏界面组件
@@ -22,7 +20,7 @@ import LLMBot from '../components/LLMBot';
  * @param {string} aiType - AI类型（兼容旧版本）
  * @param {Object} setupData - 设置数据（新版本）
  */
-const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none', setupData }) => {
+const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none', setupData, matchInfo }) => {
   // 详细调试输出
   console.log('[Board] 渲染', { 
     playerID, 
@@ -35,12 +33,25 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
     aiConfig: G.aiConfig
   });
 
-  // 基于游戏状态中的AI玩家信息判断当前玩家是否为AI
-  const isAIPlayer = G.aiPlayers && G.aiPlayers.some(ai => ai.seat_index === parseInt(playerID));
-  const currentAiType = isAIPlayer ? 
-    (G.aiPlayers.find(ai => ai.seat_index === parseInt(playerID))?.ai_type_name || 'unknown') : 
-    'none';
-  const isCurrentPlayerAI = isAIPlayer && isActive;
+  // 基于游戏状态或matchInfo判断当前玩家是否为AI（G.aiPlayers 为空时兜底）
+  let isAIPlayer = false;
+  let currentAiType = 'none';
+  const numericPlayerId = parseInt(playerID);
+  if (G.aiPlayers && Array.isArray(G.aiPlayers)) {
+    isAIPlayer = G.aiPlayers.some(ai => ai.seat_index === numericPlayerId);
+    if (isAIPlayer) {
+      currentAiType = G.aiPlayers.find(ai => ai.seat_index === numericPlayerId)?.ai_type_name || 'traditional';
+    }
+  } else if (matchInfo && Array.isArray(matchInfo.players)) {
+    const me = matchInfo.players.find(p => p.seatIndex === numericPlayerId);
+    if (me && me.isAI) {
+      isAIPlayer = true;
+      currentAiType = 'traditional';
+    }
+  }
+  // 以回合为准，避免 isActive 异常导致无法行动
+  const isMyTurn = playerID != null && playerID.toString() === ctx.currentPlayer && !ctx.gameover;
+  const isCurrentPlayerAI = isAIPlayer && isMyTurn;
   
   // 调试信息
   console.log('[Board] AI配置检查:', {
@@ -68,35 +79,27 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
       return null;
     }
     
-    switch (currentAiType) {
-      case 'traditional':
-        console.log('🎮 选择传统AI Bot');
-        return (
-          <AIBot 
-            G={G}
-            ctx={ctx}
-            moves={moves}
-            playerID={playerID}
-            isActive={isActive}
-            isAIPlayer={isAIPlayer}
-          />
-        );
-      case 'llm':
-        console.log('🎮 选择LLM Bot');
-        return (
-          <LLMBot 
-            G={G}
-            ctx={ctx}
-            moves={moves}
-            playerID={playerID}
-            isActive={isActive}
-            isAIPlayer={isAIPlayer}
-          />
-        );
-      default:
-        console.log('🎮 未知AI类型，不显示Bot');
-        return null;
+    // AI逻辑已移至服务端ai-manager处理，客户端仅显示AI状态
+    if (isMyTurn && !ctx.gameover) {
+      return (
+        <div style={{
+          textAlign: 'center',
+          padding: '15px',
+          backgroundColor: '#e3f2fd',
+          border: '1px solid #2196f3',
+          borderRadius: '8px',
+          margin: '10px 0'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '5px' }}>🤖</div>
+          <div style={{ color: '#1976d2', fontWeight: 'bold' }}>AI正在思考中...</div>
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+            由服务端AI处理 ({currentAiType})
+          </div>
+        </div>
+      );
     }
+    
+    return null;
   };
 
   /**
@@ -122,14 +125,12 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
       typeof id === 'number' &&
       id >= 0 &&
       id < 9 &&
-      isActive &&
+      isMyTurn &&
       playerID !== null &&
       G.cells &&
       G.cells[id] === null &&
       !isAIPlayer // 只有人类玩家才能点击
     ) {
-      // 🔧 重要：直接传递参数，让 boardgame.io 自己处理
-      // 经过测试，这是正确的调用方式
       moves.clickCell(id);
     }
   };
@@ -243,8 +244,8 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
         {G.cells.map((cell, index) => (
           <button
             key={index}
-            onClick={() => moves.clickCell(index)}
-            disabled={!isActive || cell !== null || ctx.gameover}
+            onClick={() => onClick(index)}
+            disabled={!isMyTurn || cell !== null || ctx.gameover}
             style={{
               width: '80px',
               height: '80px',
@@ -252,11 +253,11 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
               fontWeight: 'bold',
               border: '2px solid #333',
               backgroundColor: cell ? '#e0e0e0' : '#fff',
-              cursor: isActive && cell === null && !ctx.gameover ? 'pointer' : 'not-allowed',
+              cursor: isMyTurn && cell === null && !ctx.gameover ? 'pointer' : 'not-allowed',
               color: cell === '0' ? '#f44336' : '#2196f3'
             }}
           >
-            {cell === '0' ? 'O' : cell === '1' ? 'X' : ''}
+            {cell === '0' ? 'X' : cell === '1' ? 'O' : ''}
           </button>
         ))}
       </div>

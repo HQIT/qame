@@ -75,47 +75,66 @@ const TicTacToe = {
 
     /**
      * 重新开始游戏
+     * 允许在游戏结束后执行
      */
-    restartGame({ G }) {
-      console.log('重新开始游戏');
-      return {
-        ...G,
-        cells: Array(9).fill(null),
-        gameOver: false,
-        winner: null
-      };
+    restartGame: {
+      move: ({ G, ctx, events }) => {
+        console.log('前端：重新开始游戏');
+        
+        // 重置游戏状态
+        G.cells = Array(9).fill(null);
+        
+        // 重置任何错误状态
+        if (G.aiError) {
+          delete G.aiError;
+        }
+        
+        console.log('前端：游戏已重新开始，棋盘状态:', G.cells);
+      },
+      // 允许在游戏结束后执行此移动
+      ignoreStaleStateID: true,
     }
   },
   
   endIf: ({ G, ctx }) => {
-    console.log('检查游戏结束状态 - 参数:', { G: G, ctx: ctx });
+    console.log('前端检查游戏结束状态 - 参数:', { G: G, ctx: ctx });
     
     // 防护性检查
     if (!G || !ctx) {
-      console.log('G 或 ctx 为空，跳过结束检查');
+      console.log('前端：G 或 ctx 为空，跳过结束检查');
       return;
     }
     
     if (!G.cells) {
-      console.log('G.cells 为空，跳过结束检查');
+      console.log('前端：G.cells 为空，跳过结束检查');
       return;
     }
     
-    console.log('检查游戏结束状态:', { cells: G.cells, currentPlayer: ctx.currentPlayer });
+    // 检查是否是空棋盘（重新开始后的状态）
+    const isEmptyBoard = G.cells.every(cell => cell === null);
+    if (isEmptyBoard) {
+      console.log('前端：空棋盘，游戏未结束');
+      return; // 游戏未结束
+    }
     
-    // 检查是否有玩家获胜
-    if (IsVictory(G.cells)) {
-      console.log('检测到获胜条件');
-      return ctx.currentPlayer;
+    console.log('前端检查游戏结束状态:', { cells: G.cells, currentPlayer: ctx.currentPlayer });
+    
+    // 直接检查每个玩家是否获胜
+    for (let player of ['0', '1']) {
+      const isWinner = IsPlayerVictory(G.cells, player);
+      if (isWinner) {
+        console.log(`前端：玩家 ${player} 获胜!`);
+        return { winner: player };
+      }
     }
     
     // 检查是否平局
     if (IsDraw(G.cells)) {
-      console.log('游戏平局!');
+      console.log('前端：游戏平局!');
       return { draw: true };
     }
     
-    console.log('游戏继续进行');
+    console.log('前端：游戏继续进行');
   },
 
   // AI配置

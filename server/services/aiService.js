@@ -1,6 +1,9 @@
 const { request } = require('undici');
 const pg = require('pg');
 
+// 使用Node.js内置的fetch（Node 18+）或polyfill
+const fetch = globalThis.fetch || require('undici').fetch;
+
 // 数据库连接配置
 const dbConfig = {
   host: process.env.DB_HOST || 'postgres',
@@ -29,22 +32,45 @@ class AIService {
   }
 
   /**
-   * 获取match中的AI玩家信息
+   * 获取match中的AI玩家信息（新架构）
    * @param {string} matchId - Match ID
-   * @returns {Array} AI玩家列表
+   * @returns {Array} AI玩家列表，包含关联的AI客户端信息
    */
   async getAIPlayers(matchId) {
     try {
       const result = await this.query(`
-        SELECT mp.*
+        SELECT 
+          mp.*,
+          ap.player_name as ai_player_name,
+          ap.ai_client_id,
+          ac.name as client_name,
+          ac.endpoint as client_endpoint,
+          ac.supported_games as client_supported_games,
+          ac.description as client_description
         FROM match_players mp
+        LEFT JOIN ai_players ap ON mp.player_name = ap.player_name
+        LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
         WHERE mp.match_id = $1 
           AND mp.player_type = 'ai' 
           AND mp.status = 'joined'
         ORDER BY mp.seat_index
       `, [matchId]);
 
-      return result.rows.map(r => ({ ...r, endpoint: null, config_schema: null, ai_type_name: null }));
+      return result.rows.map(row => ({
+        ...row,
+        // 兼容旧接口的字段
+        ai_config: null, // 新架构中不再使用
+        // 新架构的字段
+        ai_client: row.ai_client_id ? {
+          id: row.ai_client_id,
+          name: row.client_name,
+          endpoint: row.client_endpoint,
+          supported_games: typeof row.client_supported_games === 'string' 
+            ? JSON.parse(row.client_supported_games) 
+            : row.client_supported_games,
+          description: row.client_description
+        } : null
+      }));
     } catch (error) {
       console.error('❌ 获取AI玩家信息失败:', error);
       return [];
@@ -52,73 +78,194 @@ class AIService {
   }
 
   /**
-   * 调用AI提供商获取移动
+   * 通过AI客户端获取移动（新架构）
    * @param {Object} aiPlayer - AI玩家信息
    * @param {Object} gameState - 游戏状态
    * @returns {Promise<number>} 移动位置，失败返回-1
    */
   async getAIMove(aiPlayer, gameState) {
-    try {
-      console.log('🤖 [Server AI] 在线AI由客户端自行决策（预设AI已废弃）');
+    console.log('🤖 [AI Service] 调用AI客户端获取移动');
 
-      // 生成提示词
-      const prompt = this.generateGamePrompt(gameState.cells, aiPlayer.seat_index.toString());
-      
-      // 构建请求体
-      let configSchema = {};
-      let aiConfig = {};
-      
-      try {
-        configSchema = JSON.parse(aiPlayer.config_schema || '{}');
-      } catch (e) {
-        console.warn('⚠️ [Server AI] 无效的config_schema JSON:', aiPlayer.config_schema);
-      }
-      
-      try {
-        aiConfig = JSON.parse(aiPlayer.ai_config || '{}');
-      } catch (e) {
-        console.warn('⚠️ [Server AI] 无效的ai_config JSON:', aiPlayer.ai_config);
-      }
-      
-      const requestBody = {
-        prompt,
-        config: {
-          ...configSchema,
-          ...aiConfig
-        }
+    // 检查AI客户端信息
+    if (!aiPlayer.ai_client || !aiPlayer.ai_client.endpoint) {
+      console.error('❌ [AI Service] AI玩家没有关联的AI客户端或缺少端点信息');
+      return -1;
+    }
+
+    const aiClient = aiPlayer.ai_client;
+    console.log('📤 [AI Service] 调用AI客户端:', {
+      clientName: aiClient.name,
+      endpoint: aiClient.endpoint,
+      playerSeat: aiPlayer.seat_index
+    });
+
+    try {
+      // 构建标准的/move接口请求
+      const moveRequest = {
+        gameType: 'TicTacToe', // 根据实际游戏类型动态设置
+        gameState: gameState,
+        playerIndex: aiPlayer.seat_index,
+        playerSymbol: aiPlayer.seat_index === 0 ? 'X' : 'O'
       };
 
-      console.log('📤 [Server AI] 发送请求:', {
-        endpoint: aiPlayer.endpoint,
-        prompt: prompt.substring(0, 100) + '...',
-        config: requestBody.config
+      console.log('🧠 [AI Service] 调用AI客户端API...');
+      
+      const response = await fetch(aiClient.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(moveRequest),
+        signal: AbortSignal.timeout(10000) // 10秒超时
       });
 
-      // 预设AI调用已废弃：尝试从ai_config里取客户端决策（未来可通过WebSocket或消息总线接入）。
-      const data = {};
-      const move = data.move;
-      if (typeof move !== 'number' || move < 0 || move > 8) {
-        console.error('❌ [Server AI] 无效的移动位置:', move);
-        throw new Error('AI返回的移动位置无效');
+      if (!response.ok) {
+        console.error('❌ [AI Service] AI客户端API请求失败:', response.status, await response.text());
+        return -1;
       }
 
-      // 验证移动位置是否可用
-      if (gameState.cells[move] !== null) {
-        console.error('❌ [Server AI] 移动位置已被占用:', move);
-        throw new Error('AI选择的位置已被占用');
+      const data = await response.json();
+      console.log('🧠 [AI Service] AI客户端响应:', data);
+      
+      // 标准化响应格式处理
+      let move = -1;
+      if (typeof data === 'number') {
+        move = data;
+      } else if (data.move !== undefined) {
+        move = data.move;
+      } else if (data.position !== undefined) {
+        move = data.position;
+      } else if (data.data && data.data.move !== undefined) {
+        move = data.data.move;
       }
-
-      console.log('✅ [Server AI] 成功获取AI移动:', move);
-      return move;
+      
+      // 验证移动有效性
+      if (!isNaN(move) && move >= 0 && move <= 8 && gameState.cells[move] === null) {
+        console.log('✅ [AI Service] AI客户端选择有效位置:', move);
+        return move;
+      } else {
+        console.error('❌ [AI Service] AI客户端返回无效位置:', { 
+          move, 
+          response: data, 
+          availablePositions: gameState.cells.map((cell, i) => cell === null ? i : null).filter(x => x !== null) 
+        });
+        return -1;
+      }
 
     } catch (error) {
-      console.error('❌ [Server AI] AI调用失败:', error);
-      return this.getFallbackMove(gameState.cells);
+      console.error('❌ [AI Service] AI客户端调用失败:', error.message);
+      return -1;
     }
   }
 
   /**
-   * 生成游戏提示词
+   * 根据AI玩家名称获取AI玩家信息
+   * @param {string} playerName - AI玩家名称
+   * @returns {Object|null} AI玩家信息
+   */
+  async getAIPlayerByName(playerName) {
+    try {
+      const result = await this.query(`
+        SELECT 
+          ap.*,
+          ac.name as client_name,
+          ac.endpoint as client_endpoint,
+          ac.supported_games as client_supported_games,
+          ac.description as client_description
+        FROM ai_players ap
+        LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
+        WHERE ap.player_name = $1 AND ap.status = 'active'
+      `, [playerName]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        ...row,
+        ai_client: row.ai_client_id ? {
+          id: row.ai_client_id,
+          name: row.client_name,
+          endpoint: row.client_endpoint,
+          supported_games: typeof row.client_supported_games === 'string' 
+            ? JSON.parse(row.client_supported_games) 
+            : row.client_supported_games,
+          description: row.client_description
+        } : null
+      };
+    } catch (error) {
+      console.error('❌ 根据名称获取AI玩家失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 检查AI客户端是否支持指定游戏
+   * @param {string} clientId - AI客户端ID
+   * @param {string} gameType - 游戏类型
+   * @returns {Promise<boolean>} 是否支持
+   */
+  async checkClientSupportsGame(clientId, gameType) {
+    try {
+      const result = await this.query(`
+        SELECT supported_games 
+        FROM ai_clients 
+        WHERE id = $1
+      `, [clientId]);
+
+      if (result.rows.length === 0) {
+        return false;
+      }
+
+      const supportedGames = typeof result.rows[0].supported_games === 'string' 
+        ? JSON.parse(result.rows[0].supported_games) 
+        : result.rows[0].supported_games;
+
+      return supportedGames.includes(gameType);
+    } catch (error) {
+      console.error('❌ 检查AI客户端游戏支持失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取所有活跃的AI玩家
+   * @returns {Array} 活跃的AI玩家列表
+   */
+  async getActiveAIPlayers() {
+    try {
+      const result = await this.query(`
+        SELECT 
+          ap.*,
+          ac.name as client_name,
+          ac.endpoint as client_endpoint,
+          ac.supported_games as client_supported_games
+        FROM ai_players ap
+        LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
+        WHERE ap.status = 'active'
+        ORDER BY ap.created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        ...row,
+        ai_client: row.ai_client_id ? {
+          id: row.ai_client_id,
+          name: row.client_name,
+          endpoint: row.client_endpoint,
+          supported_games: typeof row.client_supported_games === 'string' 
+            ? JSON.parse(row.client_supported_games) 
+            : row.client_supported_games
+        } : null
+      }));
+    } catch (error) {
+      console.error('❌ 获取活跃AI玩家失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 生成游戏提示词（兼容性保留，但在新架构中由AI客户端自己处理）
    * @param {Array} cells - 棋盘状态
    * @param {string} playerID - 玩家ID
    * @returns {string} 提示词
@@ -153,37 +300,7 @@ ${board}
 ---+---+---
 6 | 7 | 8
 
-游戏策略指导：
-1. 优先选择能够立即获胜的位置
-2. 阻止对手在下一步获胜
-3. 优先选择中心位置(4)
-4. 选择角落位置(0,2,6,8)
-5. 最后选择边缘位置(1,3,5,7)
-
-请分析当前局势，选择最佳移动位置。只返回一个数字(0-8)，不要包含任何其他文字或解释。
-
-你的选择：`;
-  }
-
-  /**
-   * 获取fallback移动（当AI调用失败时）
-   * @param {Array} cells - 棋盘状态
-   * @returns {number} 移动位置
-   */
-  getFallbackMove(cells) {
-    console.log('🔄 [Server AI] 使用fallback策略');
-    
-    // 简单策略：优先中心，然后角落，最后边缘
-    const priorities = [4, 0, 2, 6, 8, 1, 3, 5, 7];
-    
-    for (const pos of priorities) {
-      if (cells[pos] === null) {
-        console.log('🔄 [Server AI] Fallback选择位置:', pos);
-        return pos;
-      }
-    }
-    
-    return -1; // 没有可用位置
+请分析当前局势，选择最佳移动位置。只返回一个数字(0-8)。`;
   }
 
   /**

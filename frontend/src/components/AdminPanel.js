@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import UserManagement from './admin/UserManagement';
 import SystemStats from './admin/SystemStats';
 import AIConfigManagement from './admin/AIConfigManagement';
-import AIClientManagement from './admin/AIClientManagement';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState(() => {
-    // 从sessionStorage恢复tab状态，默认为'users'
-    return sessionStorage.getItem('adminActiveTab') || 'users';
+    // 从sessionStorage恢复tab状态，处理失效的ai-clients标签
+    const savedTab = sessionStorage.getItem('adminActiveTab');
+    if (savedTab === 'ai-clients') {
+      // 将失效的ai-clients重定向到ai-configs
+      sessionStorage.setItem('adminActiveTab', 'ai-configs');
+      return 'ai-configs';
+    }
+    return savedTab || 'users';
   });
 
   return (
@@ -83,24 +88,7 @@ const AdminPanel = () => {
               fontWeight: activeTab === 'ai-configs' ? 'bold' : 'normal'
             }}
           >
-            🤖 AI配置管理
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('ai-clients');
-              sessionStorage.setItem('adminActiveTab', 'ai-clients');
-            }}
-            style={{
-              padding: '15px 25px',
-              border: 'none',
-              backgroundColor: activeTab === 'ai-clients' ? '#3498db' : 'transparent',
-              color: activeTab === 'ai-clients' ? 'white' : '#666',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: activeTab === 'ai-clients' ? 'bold' : 'normal'
-            }}
-          >
-            🎮 AI客户端
+            🤖 AI管理中心
           </button>
 
         </div>
@@ -110,7 +98,6 @@ const AdminPanel = () => {
           {activeTab === 'stats' && <SystemStats />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'ai-configs' && <AIConfigManagement />}
-          {activeTab === 'ai-clients' && <AIClientManagement />}
         </div>
       </div>
     </div>

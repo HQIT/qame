@@ -13,18 +13,11 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   // 状态管理
   const [matches, setMatches] = useState([]);
   const [games, setGames] = useState([]);
-  const [aiTypes, setAiTypes] = useState([]); // 预设AI已废弃，保留状态以兼容旧代码但不再使用
+  const [aiPlayers, setAiPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedGame, setSelectedGame] = useState('tic-tac-toe');
   const [creating, setCreating] = useState(false);
-
-  // AI配置状态
-  const [aiConfig, setAiConfig] = useState({
-    enabled: false,
-    aiTypeId: '',
-    aiTypeName: ''
-  });
 
   // 获取数据
   useEffect(() => {
@@ -72,9 +65,9 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       // 并行获取数据
-      const [gamesResponse, aiTypesResponse, matchesResponse] = await Promise.all([
+      const [gamesResponse, aiPlayersResponse, matchesResponse] = await Promise.all([
         api.getGames(),
-        api.getAITypes(selectedGame), // 后端已返回空数组
+        api.getActiveAIPlayers(),
         api.getMatches({ gameId: selectedGame })
       ]);
 
@@ -82,8 +75,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
         setGames(gamesResponse.data);
       }
 
-      if (aiTypesResponse.code === 200) {
-        setAiTypes(aiTypesResponse.data);
+      if (aiPlayersResponse.code === 200) {
+        setAiPlayers(aiPlayersResponse.data);
       }
 
       if (matchesResponse.code === 200) {
@@ -160,17 +153,23 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   };
 
   // 添加AI玩家
-  const addAIPlayer = async (matchId, aiTypeId) => {
+  const addAIPlayer = async (matchId, aiPlayerId, seatIndex = null) => {
     try {
+      const aiPlayer = aiPlayers.find(p => p.id === aiPlayerId);
+      if (!aiPlayer) {
+        throw new Error('AI玩家不存在');
+      }
+
       const response = await api.addPlayerToMatch(matchId, {
         playerType: 'ai',
-        playerId: aiTypeId.toString(),
-        aiConfig: {}
+        playerName: aiPlayer.player_name,
+        seatIndex: seatIndex,
+        aiPlayerId: aiPlayerId
       });
 
       if (response.code === 200) {
         console.log('AI玩家添加成功:', response.data);
-        success('AI玩家添加成功！');
+        success(`AI玩家 ${aiPlayer.player_name} 添加成功！`);
         // 刷新match列表
         await fetchData();
       } else {
@@ -178,7 +177,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
     } catch (error) {
       console.error('添加AI玩家失败:', error);
-      error('添加AI玩家失败');
+      error('添加AI玩家失败: ' + error.message);
     }
   };
 
@@ -357,107 +356,76 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   // 添加AI到指定座位
   const addOnlineAIToMatchWithSeat = async (matchId, seatIndex) => {
     try {
-      // 获取在线AI列表
-      const aiListResp = await fetch(`/ai-manager/api/clients`, { credentials: 'include' });
-      const aiListData = await aiListResp.json();
-      if (aiListData.code !== 200) {
-        error('获取AI客户端列表失败');
-        return;
-      }
-      const clients = (aiListData.data || []).filter(c => c.status === 'connected');
-      if (clients.length === 0) {
-        warning('没有在线AI客户端');
+      // 检查是否有可用的AI玩家
+      if (aiPlayers.length === 0) {
+        warning('没有可用的AI玩家，请先在AI管理中心创建AI玩家');
         return;
       }
 
-      // 优先选择空闲(lobby)的AI，其次让用户选择
-      let client = clients.find(c => !c.matchId || c.matchId === 'lobby') || clients[0];
+      // 让用户选择AI玩家
+      let selectedPlayer = aiPlayers[0];
 
-      if (clients.length > 1) {
-        const names = clients.map((c, idx) => `${idx + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`).join('\n');
-        const idx = await showSelect({ title: '选择要加入的在线AI', options: clients.map((c, i) => `${i + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`) });
-        if (idx !== null && clients[idx]) client = clients[idx];
+      if (aiPlayers.length > 1) {
+        const options = aiPlayers.map((player, i) => 
+          `${i + 1}. ${player.player_name} (${player.client_name})`
+        );
+        
+        const idx = await showSelect({ 
+          title: '选择要加入的AI玩家', 
+          options 
+        });
+        
+        if (idx !== null && aiPlayers[idx]) {
+          selectedPlayer = aiPlayers[idx];
+        } else {
+          return; // 用户取消选择
+        }
       }
 
-      // 调用AI Manager分配到match
-      await fetch(`/ai-manager/api/clients/${client.id}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, gameType: selectedGame }),
-        credentials: 'include'
-      });
+      // 添加AI玩家到指定座位
+      await addAIPlayer(matchId, selectedPlayer.id, seatIndex);
 
-      // 在我们的API中添加AI玩家到指定座位
-      const resp = await api.addPlayerToMatch(matchId, {
-        playerType: 'ai',
-        seatIndex: seatIndex,
-        aiConfig: { clientId: client.id, playerName: client.playerName }
-      });
-
-      if (resp.code === 200) {
-        success(`已添加AI ${client.playerName} 到座位 ${seatIndex + 1}`);
-        await fetchData();
-      } else {
-        error(`添加AI失败: ${resp.message}`);
-      }
     } catch (e) {
       console.error(e);
       error('添加AI失败');
     }
   };
 
-  // 添加在线AI客户端到Match
+  // 添加AI玩家到Match（任意空座位）
   const addOnlineAIToMatch = async (matchId) => {
     try {
-      // 获取在线AI列表
-      const aiListResp = await fetch(`/ai-manager/api/clients`, { credentials: 'include' });
-      const aiListData = await aiListResp.json();
-      if (aiListData.code !== 200) {
-        error('获取AI客户端列表失败');
-        return;
-      }
-      const clients = (aiListData.data || []).filter(c => c.status === 'connected');
-      if (clients.length === 0) {
-        warning('没有在线AI客户端');
+      // 检查是否有可用的AI玩家
+      if (aiPlayers.length === 0) {
+        warning('没有可用的AI玩家，请先在AI管理中心创建AI玩家');
         return;
       }
 
-      // 优先选择空闲(lobby)的AI，其次让用户选择
-      let client = clients.find(c => !c.matchId || c.matchId === 'lobby') || clients[0];
+      // 让用户选择AI玩家
+      let selectedPlayer = aiPlayers[0];
 
-      if (clients.length > 1) {
-        const names = clients.map((c, idx) => `${idx + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`).join('\n');
-        const idx = await showSelect({ title: '选择要加入的在线AI', options: clients.map((c, i) => `${i + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`) });
-        if (idx !== null && clients[idx]) client = clients[idx];
+      if (aiPlayers.length > 1) {
+        const options = aiPlayers.map((player, i) => 
+          `${i + 1}. ${player.player_name} (${player.client_name})`
+        );
+        
+        const idx = await showSelect({ 
+          title: '选择要加入的AI玩家', 
+          options 
+        });
+        
+        if (idx !== null && aiPlayers[idx]) {
+          selectedPlayer = aiPlayers[idx];
+        } else {
+          return; // 用户取消选择
+        }
       }
 
-      // 调用AI Manager分配到match
-      await fetch(`/ai-manager/api/clients/${client.id}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, gameType: selectedGame }),
-        credentials: 'include'
-      });
+      // 添加AI玩家到任意空座位
+      await addAIPlayer(matchId, selectedPlayer.id);
 
-      // 计算应使用的seatIndex：优先使用AI客户端的playerID（boardgame.io座位号）
-      const aiSeatIndex = Number.isInteger(parseInt(client.playerID, 10)) ? parseInt(client.playerID, 10) : 1;
-
-      // 在我们的API中添加AI玩家占位（仅在线AI，不依赖预设AI类型）
-      const resp = await api.addPlayerToMatch(matchId, {
-        playerType: 'ai',
-        seatIndex: aiSeatIndex,
-        aiConfig: { clientId: client.id, playerName: client.playerName }
-      });
-
-      if (resp.code === 200) {
-        success(`已添加在线AI: ${client.playerName}`);
-        await fetchData();
-      } else {
-        error(`添加在线AI失败: ${resp.message}`);
-      }
     } catch (e) {
       console.error(e);
-      error('添加在线AI失败');
+      error('添加AI失败');
     }
   };
 

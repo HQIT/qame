@@ -6,20 +6,20 @@ class AIClientModel {
     try {
       const {
         id,
-        player_name,
-        game_type,
-        status = 'created',
-        match_id = null,
-        player_id = null,
-        ai_config = {}
+        name,
+        endpoint,
+        supported_games = [],
+        description = ''
       } = clientData;
 
       const result = await query(`
         INSERT INTO ai_clients (
-          id, player_name, game_type, status, match_id, player_id, ai_config, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+          id, name, endpoint, supported_games, description, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         RETURNING *
-      `, [id, player_name, game_type, status, match_id, player_id, JSON.stringify(ai_config)]);
+      `, [
+        id, name, endpoint, JSON.stringify(supported_games), description
+      ]);
 
       return result.rows[0];
     } catch (error) {
@@ -28,29 +28,41 @@ class AIClientModel {
     }
   }
 
-  // 更新AI客户端状态
-  static async updateStatus(clientId, status, additionalData = {}) {
+  // 更新AI客户端信息
+  static async update(clientId, updateData) {
     try {
-      const setClause = ['status = $2', 'updated_at = NOW()'];
-      const values = [clientId, status];
-      let paramIndex = 3;
+      const {
+        name,
+        endpoint,
+        supported_games,
+        description
+      } = updateData;
 
-      // 动态添加其他字段
-      if (additionalData.match_id !== undefined) {
-        setClause.push(`match_id = $${paramIndex}`);
-        values.push(additionalData.match_id);
+      const setClause = ['updated_at = NOW()'];
+      const values = [clientId];
+      let paramIndex = 2;
+
+      if (name !== undefined) {
+        setClause.push(`name = $${paramIndex}`);
+        values.push(name);
         paramIndex++;
       }
 
-      if (additionalData.player_id !== undefined) {
-        setClause.push(`player_id = $${paramIndex}`);
-        values.push(additionalData.player_id);
+      if (endpoint !== undefined) {
+        setClause.push(`endpoint = $${paramIndex}`);
+        values.push(endpoint);
         paramIndex++;
       }
 
-      if (additionalData.last_seen !== undefined) {
-        setClause.push(`last_seen = $${paramIndex}`);
-        values.push(additionalData.last_seen);
+      if (supported_games !== undefined) {
+        setClause.push(`supported_games = $${paramIndex}`);
+        values.push(JSON.stringify(supported_games));
+        paramIndex++;
+      }
+
+      if (description !== undefined) {
+        setClause.push(`description = $${paramIndex}`);
+        values.push(description);
         paramIndex++;
       }
 
@@ -63,7 +75,7 @@ class AIClientModel {
 
       return result.rows[0];
     } catch (error) {
-      console.error('更新AI客户端状态失败:', error);
+      console.error('更新AI客户端失败:', error);
       throw error;
     }
   }
@@ -91,7 +103,7 @@ class AIClientModel {
 
       return result.rows.map(row => ({
         ...row,
-        ai_config: typeof row.ai_config === 'string' ? JSON.parse(row.ai_config) : row.ai_config
+        supported_games: typeof row.supported_games === 'string' ? JSON.parse(row.supported_games) : row.supported_games
       }));
     } catch (error) {
       console.error('获取AI客户端列表失败:', error);
@@ -113,7 +125,7 @@ class AIClientModel {
       const row = result.rows[0];
       return {
         ...row,
-        ai_config: typeof row.ai_config === 'string' ? JSON.parse(row.ai_config) : row.ai_config
+        supported_games: typeof row.supported_games === 'string' ? JSON.parse(row.supported_games) : row.supported_games
       };
     } catch (error) {
       console.error('获取AI客户端失败:', error);
@@ -121,38 +133,18 @@ class AIClientModel {
     }
   }
 
-  // 清理过期的AI客户端
-  static async cleanup(olderThanMinutes = 60) {
+  // 检查AI客户端是否支持指定游戏
+  static async supportsGame(clientId, gameType) {
     try {
-      const result = await query(`
-        DELETE FROM ai_clients 
-        WHERE status IN ('disconnected', 'error') 
-          AND updated_at < NOW() - INTERVAL '${olderThanMinutes} minutes'
-        RETURNING *
-      `);
-
-      console.log(`清理了 ${result.rows.length} 个过期的AI客户端`);
-      return result.rows;
+      const client = await this.getById(clientId);
+      if (!client) {
+        return false;
+      }
+      
+      return client.supported_games.includes(gameType);
     } catch (error) {
-      console.error('清理AI客户端失败:', error);
-      throw error;
-    }
-  }
-
-  // 更新心跳时间
-  static async updateHeartbeat(clientId) {
-    try {
-      const result = await query(`
-        UPDATE ai_clients 
-        SET last_seen = NOW(), updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-      `, [clientId]);
-
-      return result.rows[0];
-    } catch (error) {
-      console.error('更新AI客户端心跳失败:', error);
-      throw error;
+      console.error('检查AI客户端游戏支持失败:', error);
+      return false;
     }
   }
 }

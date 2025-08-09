@@ -1,8 +1,26 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, generateToken, JWT_EXPIRES_IN } = require('../middleware/auth');
 const OnlineUser = require('../models/OnlineUser');
+const User = require('../models/User');
 
 const router = express.Router();
+
+// 将JWT过期时间字符串转换为毫秒
+function parseJWTExpiresIn(expiresIn) {
+  const match = expiresIn.match(/^(\d+)([dhms])$/);
+  if (!match) return 4 * 60 * 60 * 1000; // 默认4小时
+  
+  const [, value, unit] = match;
+  const num = parseInt(value);
+  
+  switch (unit) {
+    case 'd': return num * 24 * 60 * 60 * 1000;
+    case 'h': return num * 60 * 60 * 1000;
+    case 'm': return num * 60 * 1000;
+    case 's': return num * 1000;
+    default: return 4 * 60 * 60 * 1000;
+  }
+}
 
 // 用户上线心跳接口
 router.post('/heartbeat', authenticateToken, async (req, res) => {
@@ -24,12 +42,28 @@ router.post('/heartbeat', authenticateToken, async (req, res) => {
     // 获取当前在线统计
     const stats = await OnlineUser.getStats();
 
+    // 🔄 自动刷新JWT token（延长登录状态）
+    // 获取用户信息用于生成新token
+    const user = await User.findById(userId);
+    if (user) {
+      const newToken = generateToken(user);
+      
+      // 设置新的JWT到Cookie中（与JWT过期时间一致）
+      res.cookie('accessToken', newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: parseJWTExpiresIn(JWT_EXPIRES_IN)
+      });
+    }
+
     res.json({
       code: 200,
       message: '心跳更新成功',
       data: {
         status: 'online',
-        onlineCount: parseInt(stats.total)
+        onlineCount: parseInt(stats.total),
+        tokenRefreshed: !!user // 告知前端token是否已刷新
       }
     });
 

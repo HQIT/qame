@@ -11,92 +11,13 @@ class AIClientManager {
     this.aiTypes = new Map(); // typeId -> AI type config (向后兼容)
     this.aiConfigs = new Map(); // configId -> AI config (新的统一配置)
     
-    // 初始化默认配置
-    this.initializeDefaults();
-    
     // 延迟启动自动重连，等待数据库连接就绪
     setTimeout(() => {
       this.autoReconnectClients();
     }, 2000);
   }
 
-  /**
-   * 初始化默认配置
-   */
-  initializeDefaults() {
-    // 默认统一AI配置
-    this.aiConfigs.set('default', {
-      id: 'default',
-      name: '默认AI',
-      description: '默认的AI配置，适合基础游戏',
-      type: 'basic',
-      
-      // LLM配置
-      endpoint: 'http://localhost:3001/api/llm-bot-v1/move',
-      apiKey: '',
-      model: 'gpt-3.5-turbo',
-      maxTokens: 100,
-      temperature: 0.7,
-      systemPrompt: '你是一个聪明的游戏AI助手。请分析游戏状态并选择最佳移动。',
-      
-      // 能力配置
-      supportedGames: ['tic-tac-toe'],
-      maxComplexity: 'simple',
-      maxPlayers: 2,
-      maxBoardSize: 9,
-      features: {
-        strategicThinking: false,
-        patternRecognition: true,
-        longTermPlanning: false,
-        realTimeDecision: true
-      },
-      
-      // 行为配置
-      minThinkTime: 1000,
-      maxThinkTime: 3000,
-      useFallback: true,
-      validateMoves: true
-    });
-    
-    // 向后兼容：保持旧的LLM配置格式
-    this.llmConfigs.set('default', {
-      id: 'default',
-      name: '默认LLM',
-      endpoint: 'http://localhost:3001/api/llm-bot-v1/move',
-      apiKey: '',
-      model: 'gpt-3.5-turbo',
-      maxTokens: 100,
-      temperature: 0.7,
-      timeout: 10000,
-      systemPrompt: '你是一个聪明的游戏AI助手。请分析游戏状态并选择最佳移动。',
-      gamePrompts: {
-        'tic-tac-toe': '这是一个井字棋游戏。请分析当前棋盘状态，选择最佳位置(0-8)。',
-        'connect-four': '这是一个四子棋游戏。请分析当前棋盘状态，选择最佳列位置。',
-        'checkers': '这是一个跳棋游戏。请分析当前棋盘状态，选择最佳移动策略。'
-      }
-    });
 
-    // 向后兼容：保持旧的AI类型格式
-    this.aiTypes.set('basic', {
-      id: 'basic',
-      name: '基础AI',
-      description: '适合简单游戏的AI玩家',
-      supportedGames: ['tic-tac-toe'],
-      complexity: 'simple',
-      maxPlayers: 2,
-      features: ['patternRecognition']
-    });
-
-    this.aiTypes.set('strategic', {
-      id: 'strategic',
-      name: '策略AI',
-      description: '适合中等复杂度游戏的AI玩家',
-      supportedGames: ['tic-tac-toe', 'connect-four', 'checkers'],
-      complexity: 'medium',
-      maxPlayers: 4,
-      features: ['strategicThinking', 'patternRecognition']
-    });
-  }
 
   /**
    * 自动重连所有断开的AI客户端
@@ -181,10 +102,14 @@ class AIClientManager {
     console.log(`🤖 [AI Manager] 创建AI客户端: ${clientId}`);
 
     try {
-      // 获取AI配置
-      const aiConfig = aiConfigId ? this.getAIConfig(aiConfigId) : this.getAIConfig('default');
+      // 获取AI配置（必须指定）
+      if (!aiConfigId) {
+        throw new Error('必须指定AI配置ID，不支持默认配置');
+      }
+      
+      const aiConfig = this.getAIConfig(aiConfigId);
       if (!aiConfig) {
-        throw new Error(`AI配置不存在: ${aiConfigId || 'default'}`);
+        throw new Error(`AI配置不存在: ${aiConfigId}`);
       }
 
       // 创建简化的AI客户端配置
@@ -438,9 +363,6 @@ class AIClientManager {
   }
 
   deleteLLMConfig(configId) {
-    if (configId === 'default') {
-      throw new Error('不能删除默认配置');
-    }
     return this.llmConfigs.delete(configId);
   }
 
@@ -553,10 +475,6 @@ class AIClientManager {
   }
 
   deleteAIConfig(configId) {
-    if (configId === 'default') {
-      throw new Error('不能删除默认配置');
-    }
-    
     const deleted = this.aiConfigs.delete(configId);
     // 同时删除LLM配置以保持兼容性
     this.llmConfigs.delete(configId);
