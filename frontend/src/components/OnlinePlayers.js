@@ -60,7 +60,7 @@ const OnlinePlayers = ({ currentUser }) => {
       };
       
       // 使用专门的管理员强制离开API
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/matches/${user.match_id}/force-leave`, {
+      const response = await fetch(`/api/matches/${user.match_id}/force-leave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -125,10 +125,7 @@ const OnlinePlayers = ({ currentUser }) => {
       if (currentUser) {
         const formData = new FormData();
         formData.append('data', '{}');
-        navigator.sendBeacon(
-          `${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/online/offline`,
-          formData
-        );
+        navigator.sendBeacon(`/api/online/offline`, formData);
       }
     };
 

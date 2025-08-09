@@ -228,6 +228,15 @@ class MatchPlayer {
     return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
   }
 
+  // 按玩家记录ID更新凭证（用于AI或无userId的场景）
+  static async updatePlayerCredentialsByPlayerId(playerId, playerCredentials) {
+    const result = await query(
+      'UPDATE match_players SET player_credentials = $1 WHERE id = $2 RETURNING *',
+      [playerCredentials, playerId]
+    );
+    return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
+  }
+
   // 查找match的第一个玩家
   static async findFirstPlayerByMatchId(matchId) {
     const result = await query(

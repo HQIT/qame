@@ -18,7 +18,7 @@ const Login = ({ onLogin }) => {
       // 对密码进行哈希处理
       const { hashedPassword } = await hashPasswordForTransmission(formData.password);
       
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/auth/login`, {
+      const response = await fetch(`/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

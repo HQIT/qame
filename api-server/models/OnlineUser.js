@@ -83,7 +83,10 @@ class OnlineUser {
       LEFT JOIN games g ON m.game_id = g.id
       LEFT JOIN match_players mp_ai ON mp_ai.match_id = ac.match_id 
         AND mp_ai.player_type = 'ai' 
-        AND mp_ai.player_name = ac.player_name
+        AND (
+          mp_ai.player_name = ac.player_name
+          OR mp_ai.player_name = ('AI-' || substr(ac.id::text, 1, 6))
+        )
       WHERE ac.status IN ('connected', 'connecting') 
         AND ac.last_seen > CURRENT_TIMESTAMP - INTERVAL '${timeoutMinutes} minutes'
       

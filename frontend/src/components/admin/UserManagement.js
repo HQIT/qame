@@ -15,7 +15,7 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/admin/users`, {
+      const response = await fetch(`/api/admin/users`, {
         credentials: 'include' // 使用Cookie认证
       });
 
@@ -35,7 +35,7 @@ const UserManagement = () => {
 
   const handleCreateUser = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/admin/users`, {
+      const response = await fetch(`/api/admin/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -66,7 +66,7 @@ const UserManagement = () => {
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/admin/users/${editingUser.id}`, {
+      const response = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -95,7 +95,7 @@ const UserManagement = () => {
     }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}/api/admin/users/${userId}`, {
+      const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
         credentials: 'include'
       });

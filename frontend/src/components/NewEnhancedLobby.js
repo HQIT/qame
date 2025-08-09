@@ -365,7 +365,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   const addOnlineAIToMatchWithSeat = async (matchId, seatIndex) => {
     try {
       // 获取在线AI列表
-      const aiListResp = await fetch(`${process.env.REACT_APP_API_SERVER || 'https://192.168.1.156'}/ai-manager/api/clients`, { credentials: 'include' });
+      const aiListResp = await fetch(`/ai-manager/api/clients`, { credentials: 'include' });
       const aiListData = await aiListResp.json();
       if (aiListData.code !== 200) {
         error('获取AI客户端列表失败');
@@ -390,7 +390,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       // 调用AI Manager分配到match
-      await fetch(`${process.env.REACT_APP_API_SERVER || 'https://192.168.1.156'}/ai-manager/api/clients/${client.id}/assign`, {
+      await fetch(`/ai-manager/api/clients/${client.id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ matchId, gameType: selectedGame }),
@@ -420,7 +420,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   const addOnlineAIToMatch = async (matchId) => {
     try {
       // 获取在线AI列表
-      const aiListResp = await fetch(`${process.env.REACT_APP_API_SERVER || 'https://192.168.1.156'}/ai-manager/api/clients`, { credentials: 'include' });
+      const aiListResp = await fetch(`/ai-manager/api/clients`, { credentials: 'include' });
       const aiListData = await aiListResp.json();
       if (aiListData.code !== 200) {
         error('获取AI客户端列表失败');
@@ -445,7 +445,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       // 调用AI Manager分配到match
-      await fetch(`${process.env.REACT_APP_API_SERVER || 'https://192.168.1.156'}/ai-manager/api/clients/${client.id}/assign`, {
+      await fetch(`/ai-manager/api/clients/${client.id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ matchId, gameType: selectedGame }),
@@ -558,36 +558,15 @@ const NewEnhancedLobby = ({ onGameStart }) => {
             )}
             
             {/* 玩家操作按钮 */}
-            {playerInMatch ? (
+            {playerInMatch && match.status === 'playing' && (
               <button
                 onClick={() => {
-                  if (match.status === 'playing') {
-                    // 使用boardgame.io的真实match ID，如果没有则使用我们的ID
-                    const bgioMatchId = match.bgio_match_id || match.id;
-                    onGameStart(bgioMatchId, playerInMatch.seatIndex.toString(), currentUser?.username, selectedGame);
-                  } else {
-                    warning('游戏尚未开始，请等待创建者开始游戏或等待更多玩家加入');
-                  }
+                  const bgioMatchId = match.bgio_match_id || match.id;
+                  onGameStart(bgioMatchId, playerInMatch.seatIndex.toString(), currentUser?.username, selectedGame);
                 }}
-                disabled={match.status !== 'playing'}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: match.status === 'playing' ? '#007bff' : '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: match.status === 'playing' ? 'pointer' : 'not-allowed',
-                  fontSize: '12px'
-                }}
-              >
-                {match.status === 'playing' ? '进入游戏' : '游戏结束'}
-              </button>
-            ) : canJoin ? (
-              <button
-                onClick={() => joinAsHuman(match.id)}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#28a745',
+                  backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
@@ -595,22 +574,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                   fontSize: '12px'
                 }}
               >
-                加入游戏
-              </button>
-            ) : (
-              <button
-                disabled
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'not-allowed',
-                  fontSize: '12px'
-                }}
-              >
-                {match.status !== 'waiting' ? '不可加入' : '已满员'}
+                进入游戏
               </button>
             )}
           </div>

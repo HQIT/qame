@@ -1,4 +1,4 @@
-// 统一的API调用函数
+// 统一的API调用函数（同源相对路径）
 export const apiCall = async (url, options = {}) => {
   const defaultOptions = {
     credentials: 'include', // 自动发送Cookie
@@ -8,7 +8,8 @@ export const apiCall = async (url, options = {}) => {
     }
   };
 
-  const response = await fetch(`${process.env.REACT_APP_API_SERVER || 'http://localhost:8001'}${url}`, {
+  // 使用同源相对路径，交由Nginx反向代理
+  const response = await fetch(`${url}`, {
     ...defaultOptions,
     ...options
   });

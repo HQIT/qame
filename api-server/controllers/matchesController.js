@@ -3,6 +3,7 @@ const { fetch } = require('undici');
 const Match = require('../models/Match');
 const MatchPlayer = require('../models/MatchPlayer');
 const Game = require('../models/Game');
+const AiClient = require('../models/AiClient');
 
 function ok(res, data, message = 'OK') {
   return res.json({ code: 200, message, data });
@@ -187,6 +188,7 @@ exports.addPlayer = async (req, res) => {
     } else if (playerType === 'ai') {
       if (!isCreator) return forbidden(res, '只有创建者可以添加AI玩家');
       if (!(aiConfig && aiConfig.clientId)) return badRequest(res, 'AI玩家必须提供aiConfig.clientId');
+      if (!aiConfig.playerName) return badRequest(res, 'AI玩家必须提供aiConfig.playerName');
       // 预设AI类型已移除；不再校验/复用 ai_type_id
     }
 
@@ -200,17 +202,29 @@ exports.addPlayer = async (req, res) => {
       }
     }
 
+    // 统一 player_name：
+    // - human: 使用传入的 playerName 或当前用户名
+    // - ai: 优先使用 aiConfig.playerName（AI 客户端展示名）；否则使用精简格式 `AI-<clientId前6位>`
+    const resolvedPlayerName =
+      playerType === 'human'
+        ? (playerName || req.user.username)
+        : aiConfig?.playerName;
+
     const playerData = {
       matchId,
       seatIndex: targetSeatIndex,
       playerType,
-      playerName: playerName || (playerType === 'human' ? req.user.username : `AI-${aiConfig?.clientId}`),
+      playerName: resolvedPlayerName,
       aiConfig,
     };
     if (playerType === 'human') playerData.userId = req.user.id;
     // AI不再写入 aiTypeId
 
     const player = await MatchPlayer.addPlayer(playerData);
+    // 若为AI，写回 ai_clients 绑定
+    if (playerType === 'ai' && aiConfig?.clientId) {
+      try { await AiClient.assignToMatch(aiConfig.clientId, matchId, targetSeatIndex); } catch (_) {}
+    }
 
     try {
       const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
@@ -244,27 +258,18 @@ exports.addPlayer = async (req, res) => {
       if (!resp.ok) {
         const txt = await resp.text();
         console.log('❌ join失败响应:', txt);
-        if (resp.status === 409) {
-          // 座位冲突，尝试先leave再重新join
-          try {
-            const preLeaveUrl2 = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/leave`;
-            await fetch(preLeaveUrl2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerID: targetSeatIndex.toString() }) });
-          } catch (_) {}
-          const retry = await fetch(joinUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerID: targetSeatIndex.toString(), playerName: playerData.playerName }) });
-          if (!retry.ok) {
-            const retryTxt = await retry.text();
-            await MatchPlayer.removePlayer(matchId, player.id);
-            throw new Error(`加入游戏match失败: ${resp.status} - ${txt}; 重试失败: ${retry.status} - ${retryTxt}`);
-          }
-        } else {
-          await MatchPlayer.removePlayer(matchId, player.id);
-          throw new Error(`加入游戏match失败: ${resp.status} - ${txt}`);
-        }
+        // 简化：不做预清理与重试，直接清理数据库记录并返回错误
+        await MatchPlayer.removePlayer(matchId, player.id);
+        throw new Error(`加入游戏match失败: ${resp.status} - ${txt}`);
       } else {
         const data = await resp.json();
-        // 仅在人类玩家时写入用户凭证
-        if (playerType === 'human' && data.playerCredentials) {
-          await MatchPlayer.updatePlayerCredentials(matchId, req.user.id, data.playerCredentials);
+        // 加入成功后，统一为玩家写入凭证（人类与AI一致处理）
+        if (data.playerCredentials) {
+          if (playerType === 'human') {
+            await MatchPlayer.updatePlayerCredentials(matchId, req.user.id, data.playerCredentials);
+          } else if (player && player.id) {
+            await MatchPlayer.updatePlayerCredentialsByPlayerId(player.id, data.playerCredentials);
+          }
         }
       }
     } catch (err) {
@@ -318,6 +323,13 @@ exports.removePlayer = async (req, res) => {
     if (!player.canBeRemoved(req.user.id, isCreator)) return forbidden(res, '没有权限移除此玩家');
 
     await MatchPlayer.removePlayer(matchId, player.id);
+    // 若为AI，清空 ai_clients 绑定
+    try {
+      if (player.player_type === 'ai') {
+        const cfg = typeof player.ai_config === 'string' ? JSON.parse(player.ai_config || '{}') : (player.ai_config || {});
+        if (cfg.clientId) await AiClient.clearAssignmentByClientId(cfg.clientId);
+      }
+    } catch (_) {}
 
     // 同步boardgame.io（忽略失败）
     try {
@@ -325,10 +337,13 @@ exports.removePlayer = async (req, res) => {
       if (bgioMatchId) {
         const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
         const leaveUrl = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/leave`;
+        const leaveBody = player.player_credentials
+          ? { playerID: player.seat_index.toString(), credentials: player.player_credentials }
+          : { playerID: player.seat_index.toString() };
         await fetch(leaveUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerID: player.seat_index.toString() })
+          body: JSON.stringify(leaveBody)
         });
       }
     } catch (e) {
@@ -364,6 +379,13 @@ exports.forceLeavePlayer = async (req, res) => {
 
     // 移除玩家
     await MatchPlayer.removePlayer(matchId, player.id);
+    // 若为AI，清空 ai_clients 绑定
+    try {
+      if (player.player_type === 'ai') {
+        const cfg = typeof player.ai_config === 'string' ? JSON.parse(player.ai_config || '{}') : (player.ai_config || {});
+        if (cfg.clientId) await AiClient.clearAssignmentByClientId(cfg.clientId);
+      }
+    } catch (_) {}
 
     // 通知boardgame.io服务器该玩家离开
     try {
@@ -372,10 +394,13 @@ exports.forceLeavePlayer = async (req, res) => {
       if (bgioMatchId) {
         const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
         const leaveUrl = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/leave`;
+        const leaveBody = player.player_credentials
+          ? { playerID: player.seat_index.toString(), credentials: player.player_credentials }
+          : { playerID: player.seat_index.toString() };
         await fetch(leaveUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerID: player.seat_index.toString() })
+          body: JSON.stringify(leaveBody)
         });
       }
     } catch (bgioError) {

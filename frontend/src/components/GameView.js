@@ -90,8 +90,8 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
       };
 
       console.log('🔌 创建boardgame.io客户端:', {
-        server: process.env.REACT_APP_SERVER || "http://localhost:8000",
-        gameServer: process.env.REACT_APP_GAME_SERVER || "http://localhost:8000",
+        server: window.location.origin,
+        gameServer: window.location.origin,
         matchID,
         playerID,
         playerName,
@@ -109,7 +109,7 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
         credentials: playerCredentials,
         setupData,
         multiplayer: SocketIO({ 
-          server: process.env.REACT_APP_GAME_SERVER || "http://localhost:8000"
+          server: window.location.origin
         }),
         // 详细错误处理和状态显示
         onConnect: () => {

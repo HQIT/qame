@@ -3,15 +3,11 @@
  * 用于调用API服务器获取游戏决策
  */
 
-// API服务器端点
-const API_SERVER_ENDPOINT = process.env.REACT_APP_API_SERVER 
-  ? `${process.env.REACT_APP_API_SERVER}/api/ai/move`
-  : 'http://localhost:8001/api/ai/move';
+// API服务器端点（同源相对路径）
+const API_SERVER_ENDPOINT = `/api/ai/move`;
 
-// AI类型列表API端点
-const AI_TYPES_ENDPOINT = process.env.REACT_APP_API_SERVER 
-  ? `${process.env.REACT_APP_API_SERVER}/api/ai/types`
-  : 'http://localhost:8001/api/ai/types';
+// AI类型列表API端点（同源相对路径）
+const AI_TYPES_ENDPOINT = `/api/ai/types`;
 
 /**
  * 获取AI类型列表
@@ -99,11 +95,11 @@ export async function getLLMMove(aiTypeId, gameState, config = {}) {
  */
 export function isLLMServiceAvailable() {
   // 检查API服务器是否可用
-  const hasApiServer = !!process.env.REACT_APP_API_SERVER || true; // 默认假设本地服务器可用
+  const hasApiServer = true;
   
   console.log('🔧 AI服务可用性检查:', {
     hasApiServer,
-    apiServerEndpoint: process.env.REACT_APP_API_SERVER || 'http://localhost:8001',
+    apiServerEndpoint: window.location.origin,
     aiApiEndpoint: API_SERVER_ENDPOINT
   });
   

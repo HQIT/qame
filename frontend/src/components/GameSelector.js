@@ -109,8 +109,8 @@ const GameSelector = () => {
       </div>
 
       <Lobby
-        gameServer={process.env.REACT_APP_SERVER || "http://localhost:8000"}
-        lobbyServer={process.env.REACT_APP_SERVER || "http://localhost:8000"}
+        gameServer={window.location.origin}
+        lobbyServer={window.location.origin}
         gameComponents={[
           { 
             game: TicTacToe, 
