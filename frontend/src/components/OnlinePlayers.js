@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { useDialog } from '../hooks/useDialog';
 
 const OnlinePlayers = ({ currentUser }) => {
+  const { dialogs, confirm, success: showSuccess, error: showError } = useDialog();
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [stats, setStats] = useState({ total: 0, idle: 0, playing: 0 });
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ const OnlinePlayers = ({ currentUser }) => {
     if (!user.match_id) return;
     
     try {
-      const confirmed = window.confirm(`确定要让 ${user.username} 离开游戏吗？`);
+      const confirmed = await confirm(`确定要让 ${user.username} 离开游戏吗？`, '确认操作');
       if (!confirmed) return;
       
       // 构建请求参数 - 直接使用玩家ID
@@ -68,16 +70,15 @@ const OnlinePlayers = ({ currentUser }) => {
       });
       
       if (response.ok) {
-        console.log(`✅ 成功让 ${user.username} 离开游戏`);
-        // 刷新在线用户列表
+        showSuccess(`已让 ${user.username} 离开游戏`);
         fetchOnlineUsers();
       } else {
         console.error('❌ 强制离开游戏失败:', response.status);
-        alert('操作失败，请稍后重试');
+        showError('操作失败，请稍后重试');
       }
     } catch (error) {
       console.error('❌ 强制离开游戏失败:', error);
-      alert('操作失败，请稍后重试');
+      showError('操作失败，请稍后重试');
     }
   };
 
@@ -178,20 +179,23 @@ const OnlinePlayers = ({ currentUser }) => {
   // 如果用户未登录，显示提示信息
   if (!currentUser) {
     return (
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        minHeight: '300px'
-      }}>
-        <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>
-          🌐 在线玩家
-        </h3>
-        <div style={{ textAlign: 'center', color: '#666' }}>
-          请先登录查看在线玩家
+      <>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '20px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          minHeight: '300px'
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>
+            🌐 在线玩家
+          </h3>
+          <div style={{ textAlign: 'center', color: '#666' }}>
+            请先登录查看在线玩家
+          </div>
         </div>
-      </div>
+        {/* 全局 DialogProvider 已统一渲染，无需本地渲染器 */}
+      </>
     );
   }
 
@@ -252,34 +256,23 @@ const OnlinePlayers = ({ currentUser }) => {
     <div style={{
       backgroundColor: 'white',
       borderRadius: '8px',
-      padding: '20px',
+      padding: '16px',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
       minHeight: '300px'
     }}>
-      <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>
-        🌐 在线玩家 ({onlineUsers.length})
-      </h3>
-
-      {/* 统计信息 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-around',
-        marginBottom: '20px',
-        padding: '15px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '6px'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#27ae60' }}>
-            {stats.idle}
-          </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>空闲</div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db' }}>
-            {stats.playing}
-          </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>游戏中</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '16px' }}>
+          🌐 在线玩家 <span style={{ color: '#95a5a6', fontWeight: 'normal' }}>({onlineUsers.length})</span>
+        </h3>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <span style={{
+            fontSize: '11px', color: '#2d3436', background: '#ecf0f1',
+            padding: '2px 6px', borderRadius: 12
+          }}>空闲 {stats.idle || 0}</span>
+          <span style={{
+            fontSize: '11px', color: 'white', background: '#3498db',
+            padding: '2px 6px', borderRadius: 12
+          }}>游戏中 {stats.playing || 0}</span>
         </div>
       </div>
 
@@ -303,117 +296,67 @@ const OnlinePlayers = ({ currentUser }) => {
               <div
                 key={user.id}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '12px',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  rowGap: 6,
+                  padding: '10px 8px',
                   borderBottom: '1px solid #ecf0f1',
                   transition: 'background-color 0.2s ease'
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '4px'
-                  }}>
-                    <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#2c3e50' }}>
+                <div style={{ minWidth: 0 }}>
+                  {/* 行1：名字 + 角色徽标 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#2c3e50', whiteSpace: 'nowrap' }}>
                       {user.player_type === 'ai' ? '🤖 ' : ''}{user.username}
                     </span>
                     {user.role === 'admin' && (
-                      <span style={{
-                        marginLeft: '8px',
-                        fontSize: '12px',
-                        backgroundColor: '#e74c3c',
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '10px'
-                      }}>
-                        管理员
-                      </span>
+                      <span style={{ fontSize: 10, backgroundColor: '#e74c3c', color: 'white', padding: '1px 6px', borderRadius: 10 }}>管理员</span>
                     )}
                     {user.role === 'ai' && (
-                      <span style={{
-                        marginLeft: '8px',
-                        fontSize: '12px',
-                        backgroundColor: '#9b59b6',
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '10px'
-                      }}>
-                        AI
-                      </span>
+                      <span style={{ fontSize: 10, backgroundColor: '#9b59b6', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
                     )}
                   </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: '12px',
-                    color: '#666'
-                  }}>
-                    <span style={{ color: statusInfo.color }}>
-                      {statusInfo.icon} {statusInfo.text}
-                    </span>
-                    <span style={{ marginLeft: '12px' }}>
-                      ⏱️ {formatDuration((user.onlineDuration ?? user.online_duration ?? 0))}
-                    </span>
+                  {/* 行2：在线状态 + 时长 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#666', marginTop: 2 }}>
+                    <span style={{ color: statusInfo.color }}>{statusInfo.icon} {statusInfo.text}</span>
+                    <span>⏱️ {formatDuration((user.onlineDuration ?? user.online_duration ?? 0))}</span>
                   </div>
-                  {/* 显示当前游戏信息 */}
+                  {/* 行3：紧凑的游戏信息 chips */}
                   {user.status === 'playing' && user.game_name && (
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#3498db',
-                      marginTop: '2px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}>
-                      <span>🎯 {user.game_name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: '#2d3436', background: '#ecf0f1', padding: '1px 6px', borderRadius: 10 }}>🎯 {user.game_name}</span>
                       {user.match_status && (
-                        <span style={{ 
-                          marginLeft: '6px',
-                          backgroundColor: user.match_status === 'playing' ? '#e74c3c' : '#f39c12',
-                          color: 'white',
-                          padding: '1px 4px',
-                          borderRadius: '2px',
-                          fontSize: '10px'
-                        }}>
+                        <span style={{ fontSize: 10, color: 'white', background: (user.match_status === 'playing' ? '#e74c3c' : '#f39c12'), padding: '1px 6px', borderRadius: 10 }}>
                           {getMatchStatusText(user.match_status)}
                         </span>
                       )}
                       {user.match_id && (
-                        <span style={{ 
-                          marginLeft: '6px',
-                          color: '#95a5a6',
-                          fontSize: '10px'
-                        }}>
-                          ID: {user.match_id.substring(0, 8)}...
-                        </span>
-                      )}
-                      {/* 强制离开游戏按钮 - 只对管理员显示 */}
-                      {currentUser && currentUser.role === 'admin' && (
-                        <button
-                          onClick={() => forceLeaveGame(user)}
-                          style={{
-                            marginLeft: '8px',
-                            padding: '1px 4px',
-                            backgroundColor: '#e74c3c',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '2px',
-                            cursor: 'pointer',
-                            fontSize: '9px',
-                            transition: 'background-color 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#c0392b'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = '#e74c3c'}
-                          title={`强制 ${user.username} 离开游戏`}
-                        >
-                          ✕ 离开
-                        </button>
+                        <span style={{ fontSize: 10, color: '#95a5a6' }}>ID: {user.match_id.substring(0, 8)}...</span>
                       )}
                     </div>
+                  )}
+                </div>
+                {/* 管理操作（右侧紧凑按钮，仅管理员可见且在playing时显示） */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {currentUser && currentUser.role === 'admin' && user.status === 'playing' && user.match_id && (
+                    <button
+                      onClick={() => forceLeaveGame(user)}
+                      style={{
+                        padding: '2px 6px',
+                        backgroundColor: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        fontSize: 10
+                      }}
+                      title={`强制 ${user.username} 离开游戏`}
+                    >
+                      ✕ 离开
+                    </button>
                   )}
                 </div>
               </div>

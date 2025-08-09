@@ -1,6 +1,7 @@
 import React from 'react';
 import MessageBox from './MessageBox';
 import ConfirmDialog from './ConfirmDialog';
+import SelectDialog from './SelectDialog';
 
 const DialogRenderer = ({ dialogs }) => {
   return (
@@ -34,6 +35,20 @@ const DialogRenderer = ({ dialogs }) => {
               confirmText={dialog.confirmText}
               cancelText={dialog.cancelText}
               confirmButtonStyle={dialog.confirmButtonStyle}
+            />
+          );
+        }
+
+        if (dialog.type === 'select') {
+          return (
+            <SelectDialog
+              key={dialog.id}
+              show={true}
+              title={dialog.title}
+              message={dialog.message}
+              options={dialog.options}
+              onSelect={dialog.onSelect}
+              onCancel={dialog.onCancel}
             />
           );
         }

@@ -300,6 +300,8 @@ exports.deleteMatch = async (req, res) => {
     const match = await Match.findById(matchId);
     if (!match) return notFound(res, 'Match不存在');
 
+    // 清理所有AI绑定（ai_clients.match_id/player_id）
+    try { await AiClient.clearAssignmentByMatchId(matchId); } catch (_) {}
     await Match.delete(matchId);
     return ok(res, null, 'Match删除成功');
   } catch (error) {

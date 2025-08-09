@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
+import { DialogProvider } from './hooks/useDialog';
 import AdminPanel from './components/AdminPanel';
 import NewEnhancedLobby from './components/NewEnhancedLobby';
 import GameView from './components/GameView';
@@ -59,6 +60,13 @@ function App() {
     };
 
     checkAuth();
+    // 如果是会话过期跳转回来，给出提示（可选）
+    try {
+      if (sessionStorage.getItem('sessionExpired') === '1') {
+        sessionStorage.removeItem('sessionExpired');
+        console.warn('会话已过期，请重新登录');
+      }
+    } catch (_) {}
   }, []);
 
   const handleLogin = async (userData) => {
@@ -142,7 +150,8 @@ function App() {
   // 如果用户已登录，显示游戏选择器
   if (user) {
     return (
-      <div>
+      <DialogProvider>
+        <div>
         {/* 顶部导航栏 */}
         <div style={{
           backgroundColor: '#4CAF50',
@@ -229,12 +238,17 @@ function App() {
             />
           )}
         </div>
-      </div>
+        </div>
+      </DialogProvider>
     );
   }
 
   // 如果用户未登录，显示登录页面
-  return <Login onLogin={handleLogin} />;
+  return (
+    <DialogProvider>
+      <Login onLogin={handleLogin} />
+    </DialogProvider>
+  );
 }
 
 export default App; 

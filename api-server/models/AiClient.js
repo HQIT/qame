@@ -28,6 +28,20 @@ class AiClient {
     );
     return result.rows[0] || null;
   }
+
+  static async clearAssignmentByMatchId(matchId) {
+    if (!matchId) {
+      return null;
+    }
+    const result = await query(
+      `UPDATE ai_clients 
+       SET match_id = NULL, player_id = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE match_id = $1
+       RETURNING id`,
+      [matchId]
+    );
+    return result.rows || [];
+  }
 }
 
 module.exports = AiClient;

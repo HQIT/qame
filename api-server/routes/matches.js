@@ -352,6 +352,13 @@ router.post('/:matchId/cancel', async (req, res) => {
 
     // 更新状态
     await Match.updateStatus(matchId, 'cancelled', req.user.id, '游戏被取消');
+    // 清理AI绑定
+    try {
+      const AiClient = require('../models/AiClient');
+      await AiClient.clearAssignmentByMatchId(matchId);
+    } catch (e) {
+      console.warn('取消match时清理AI绑定失败（忽略）:', e.message);
+    }
 
     res.json({
       code: 200,

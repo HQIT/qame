@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useToast } from './MessageToast';
+import { useDialog } from '../hooks/useDialog';
+import DialogRenderer from './common/DialogRenderer';
 import OnlinePlayers from './OnlinePlayers';
 
 const NewEnhancedLobby = ({ onGameStart }) => {
   // Toast消息系统
   const { success, error, info, warning, ToastContainer } = useToast();
+  const { dialogs, confirm, showSelect } = useDialog();
 
   // 状态管理
   const [matches, setMatches] = useState([]);
@@ -200,7 +203,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
   // 删除Match
   const deleteMatch = async (matchId) => {
-    const confirmed = window.confirm('确定要删除这个Match吗？');
+    const confirmed = await confirm('确定要删除这个Match吗？', '确认删除');
     if (!confirmed) return;
 
     try {
@@ -312,21 +315,11 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     }
     
     // 使用简单的选择对话框
-    const choice = window.prompt(
-      `选择操作 (座位 ${seatIndex + 1}):\n` + 
-      options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n') + 
-      '\n\n请输入序号:',
-      '1'
-    );
-    
-    if (!choice) return; // 用户取消
-    
-    const choiceIndex = parseInt(choice, 10) - 1;
-    
-    if (choiceIndex < 0 || choiceIndex >= options.length) {
-      warning('无效的选择');
-      return;
-    }
+    const choiceIndex = await showSelect({
+      title: `选择操作 (座位 ${seatIndex + 1})`,
+      options
+    });
+    if (choiceIndex === null) return;
     
     const selectedOption = options[choiceIndex];
     
@@ -382,11 +375,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
       if (clients.length > 1) {
         const names = clients.map((c, idx) => `${idx + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`).join('\n');
-        const input = window.prompt(`选择要加入的在线AI编号:\n${names}`, '1');
-        const index = parseInt(input, 10) - 1;
-        if (!Number.isNaN(index) && clients[index]) {
-          client = clients[index];
-        }
+        const idx = await showSelect({ title: '选择要加入的在线AI', options: clients.map((c, i) => `${i + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`) });
+        if (idx !== null && clients[idx]) client = clients[idx];
       }
 
       // 调用AI Manager分配到match
@@ -437,11 +427,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
       if (clients.length > 1) {
         const names = clients.map((c, idx) => `${idx + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`).join('\n');
-        const input = window.prompt(`选择要加入的在线AI编号:\n${names}`, '1');
-        const index = parseInt(input, 10) - 1;
-        if (!Number.isNaN(index) && clients[index]) {
-          client = clients[index];
-        }
+        const idx = await showSelect({ title: '选择要加入的在线AI', options: clients.map((c, i) => `${i + 1}. ${c.playerName}${(!c.matchId || c.matchId === 'lobby') ? ' (空闲)' : ''}`) });
+        if (idx !== null && clients[idx]) client = clients[idx];
       }
 
       // 调用AI Manager分配到match
@@ -804,6 +791,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
         </div>
       </div>
       <ToastContainer />
+      <DialogRenderer dialogs={dialogs} />
     </div>
   );
 };

@@ -1,3 +1,17 @@
+// 会话过期处理（全局一次）
+function handleSessionExpired() {
+  if (window.__SESSION_EXPIRED_HANDLED__) return;
+  window.__SESSION_EXPIRED_HANDLED__ = true;
+  try {
+    sessionStorage.removeItem('user');
+    sessionStorage.setItem('sessionExpired', '1');
+  } catch (_) {}
+  // 跳回首页，让App根据user状态渲染登录页
+  setTimeout(() => {
+    window.location.href = '/';
+  }, 50);
+}
+
 // 统一的API调用函数（同源相对路径）
 export const apiCall = async (url, options = {}) => {
   const defaultOptions = {
@@ -13,6 +27,20 @@ export const apiCall = async (url, options = {}) => {
     ...defaultOptions,
     ...options
   });
+
+  // 会话过期统一处理
+  if (response.status === 401) {
+    // 仅当之前处于已登录状态（本地有user）时才触发自动跳转，
+    // 避免登录页初次verify(401)导致无限刷新
+    try {
+      const hadUser = !!sessionStorage.getItem('user');
+      if (hadUser) {
+        handleSessionExpired();
+      }
+    } catch (_) {}
+    // 返回标准化结构，避免调用方崩溃
+    return { code: 401, message: '登录已过期，请重新登录', data: null };
+  }
 
   return response.json();
 };
