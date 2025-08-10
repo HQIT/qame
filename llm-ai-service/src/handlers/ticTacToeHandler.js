@@ -24,7 +24,7 @@ class TicTacToeHandler {
       // 生成游戏状态描述的提示词
       const prompt = this.generatePrompt(G, validMoves, metadata);
       
-      console.log('🎯 [井字棋] 生成提示词:', prompt);
+      // 提示词内容已通过LLM请求体打印，避免重复日志
       
       // 调用LLM获取移动
       const move = await llmAI.getAIMove(prompt);

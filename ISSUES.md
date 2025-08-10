@@ -1,12 +1,9 @@
 # TODO
 
-- [ ] 清理文档中的隐私信息（密码、密钥、盐、令牌等），为开源做准备
-- [ ] 对齐文档与实际代码，更新偏离内容（README、DEVELOPMENT_PLAN、REFACTOR_*等）
-- [ ] 清理失效文件与代码，移除不再使用的模块与脚本
+- [ ] AI对AI的游戏局，没有开始按钮
 - [ ] 大厅三栏布局底边对齐：高度自适应但底部视觉齐平
-- [x] 会话失效时自动跳转到登录页（统一401处理）
-- [x] 统一消息组件，替换alert/confirm为内置MessageToast/ConfirmDialog（已引入DialogProvider+ConfirmDialog/SelectDialog，替换主要交互）
-- [ ] 用户会话超时控制有问题，如果我一直在使用，session不应该超时
+- [ ] 一个Player可以进多个游戏局，这是Bug
+- [ ] ecnu-reasoner模型还没有测试成功
 
 ---
 

@@ -115,7 +115,7 @@ class AIService {
         }
       };
 
-      const timeout = parseInt(process.env.AI_SERVICE_TIMEOUT) || 30000;
+      const timeout = parseInt(process.env.AI_SERVICE_TIMEOUT) || 300000; // 可配置超时，默认5分钟
       console.log('🧠 [AI Service] 调用AI客户端API...');
       console.log('⏱️ [AI Service] 超时设置:', timeout + 'ms');
       console.log('📤 [AI Service] 请求数据:', JSON.stringify(moveRequest, null, 2));

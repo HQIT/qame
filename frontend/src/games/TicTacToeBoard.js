@@ -21,17 +21,14 @@ import React, { useEffect, useState } from 'react';
  * @param {Object} setupData - 设置数据（新版本）
  */
 const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none', setupData, matchInfo }) => {
-  // 详细调试输出
-  console.log('[Board] 渲染', { 
-    playerID, 
-    isActive, 
-    ctxCurrentPlayer: ctx.currentPlayer, 
-    G, 
-    enableAI, 
-    aiType,
-    setupData,
-    aiConfig: G.aiConfig
-  });
+  // 渲染调试信息（仅在开发模式显示）
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Board] 渲染', { 
+      playerID, 
+      currentPlayer: ctx.currentPlayer, 
+      gameover: ctx.gameover
+    });
+  }
 
   // 基于游戏状态或matchInfo判断当前玩家是否为AI（G.aiPlayers 为空时兜底）
   let isAIPlayer = false;
@@ -53,15 +50,10 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
   const isMyTurn = playerID != null && playerID.toString() === ctx.currentPlayer && !ctx.gameover;
   const isCurrentPlayerAI = isAIPlayer && isMyTurn;
   
-  // 调试信息
-  console.log('[Board] AI配置检查:', {
-    playerID,
-    isAIPlayer,
-    isCurrentPlayerAI,
-    aiPlayers: G.aiPlayers,
-    currentAiType,
-    isActive
-  });
+  // AI配置调试信息（仅在开发模式显示）
+  if (process.env.NODE_ENV === 'development' && isAIPlayer) {
+    console.log('[Board] AI配置:', { playerID, currentAiType });
+  }
   
   // 前端不执行AI逻辑，只被动接收状态变化
   // AI逻辑完全由后端AI Manager处理
@@ -144,14 +136,6 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
   };
 
   let gameStatus = '';
-  console.log('游戏状态检查:', { 
-    gameover: ctx.gameover, 
-    cells: G.cells,
-    currentPlayer: ctx.currentPlayer,
-    enableAI,
-    aiType,
-    isAIPlayer
-  });
   
   if (ctx.gameover) {
     if (ctx.gameover.winner) {
@@ -205,21 +189,9 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
             <h2 style={{ color: '#4caf50' }}>
               {ctx.gameover.winner ? `玩家 ${ctx.gameover.winner} 获胜！` : '游戏平局！'}
             </h2>
-            <button
-              onClick={() => moves.restartGame()}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#2196f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                marginTop: '10px'
-              }}
-            >
-              重新开始
-            </button>
+            <p style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
+              🎉 游戏结束！可使用上方"返回游戏大厅"按钮回到大厅
+            </p>
           </div>
         ) : (
           <div>

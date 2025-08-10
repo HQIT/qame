@@ -15,7 +15,6 @@ class SimpleAIClient {
     // 游戏服务器连接
     this.gameServerUrl = config.gameServerUrl || 'http://game-server:8000';
     this.socket = null;
-    this.gameClient = null;
     
     // AI服务
     this.llmService = new LLMService(this.aiConfig);
@@ -24,8 +23,8 @@ class SimpleAIClient {
     // 状态管理
     this.status = 'created';
     this.matchId = config.matchId;
-    this.playerID = null;
-    this.credentials = null;
+    this.playerID = config.playerID || null; // 从配置中获取playerID
+    this.credentials = config.credentials || null; // 从配置中获取credentials
     this.gameState = null;
     this.logs = [];
     this.createdAt = new Date();
@@ -74,9 +73,10 @@ class SimpleAIClient {
         });
       });
 
-      // 如果有指定的match，尝试加入
-      if (this.matchId && this.matchId !== 'lobby') {
-        await this.joinMatch(this.matchId);
+      // 如果有指定的match且有playerID，直接连接
+      if (this.matchId && this.matchId !== 'lobby' && this.playerID) {
+        this.socket.emit('sync', this.matchId, this.playerID, this.credentials);
+        this.log('info', `已连接到游戏: ${this.matchId}, 玩家ID: ${this.playerID}`);
       }
 
       // 启动心跳
@@ -107,48 +107,10 @@ class SimpleAIClient {
       this.handleGameSync(gameID, syncInfo);
     });
 
-    // 监听游戏事件
+    // 监听游戏状态变化（只监听状态变化，不触发AI逻辑）
     this.socket.on('update', (gameID, syncInfo) => {
-      this.handleGameUpdate(gameID, syncInfo);
+      this.handleGameStateUpdate(gameID, syncInfo);
     });
-  }
-
-  /**
-   * 加入游戏匹配
-   */
-  async joinMatch(matchId) {
-    try {
-      this.log('info', `尝试加入游戏匹配: ${matchId}`);
-      
-      // 这里应该调用API获取匹配信息和凭证
-      const matchInfo = await this.getMatchInfo(matchId);
-      
-      if (matchInfo) {
-        this.matchId = matchInfo.matchId;
-        this.playerID = matchInfo.playerID;
-        this.credentials = matchInfo.credentials;
-        
-        // 连接到specific game
-        this.socket.emit('sync', this.matchId, this.playerID, this.credentials);
-        this.log('info', `已加入游戏: ${this.matchId}, 玩家ID: ${this.playerID}`);
-      }
-    } catch (error) {
-      this.log('error', `加入游戏失败: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * 获取匹配信息（需要调用API服务器）
-   */
-  async getMatchInfo(matchId) {
-    // 这里应该调用API服务器获取匹配信息
-    // 暂时返回模拟数据
-    return {
-      matchId: matchId,
-      playerID: '1', // 通常AI是玩家1
-      credentials: 'ai-credentials'
-    };
   }
 
   /**
@@ -169,10 +131,18 @@ class SimpleAIClient {
   }
 
   /**
-   * 处理游戏更新
+   * 处理游戏状态更新（不触发AI逻辑，只更新状态）
    */
-  handleGameUpdate(gameID, syncInfo) {
-    this.handleGameSync(gameID, syncInfo);
+  handleGameStateUpdate(gameID, syncInfo) {
+    try {
+      if (gameID !== this.matchId) return;
+      
+      // 只更新游戏状态，不触发AI逻辑
+      this.gameState = syncInfo;
+      this.log('debug', `游戏状态更新: turn ${syncInfo.state?.ctx?.turn || 0}`);
+    } catch (error) {
+      this.log('error', `处理游戏状态更新失败: ${error.message}`);
+    }
   }
 
   /**

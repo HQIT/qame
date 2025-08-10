@@ -8,6 +8,41 @@ const Match = require('../models/Match');
 const MatchPlayer = require('../models/MatchPlayer');
 const { fetch } = require('undici');
 
+// 更新match状态（内部服务调用，无需认证）
+router.put('/:matchId/status', async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const { status, notes } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({
+        code: 400,
+        message: '缺少status参数',
+        data: null
+      });
+    }
+    
+    console.log(`🔄 [Match API] 更新状态: ${matchId} -> ${status}`);
+    
+    await Match.updateStatus(matchId, status, null, notes);
+    
+    res.json({
+      code: 200,
+      message: 'Match状态更新成功',
+      data: { matchId, status, notes }
+    });
+    
+  } catch (error) {
+    console.error('❌ [Match API] 更新状态失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '更新状态失败',
+      data: null
+    });
+  }
+});
+
+// 以下路由需要认证
 router.use(authenticateToken);
 
 // 获取match列表

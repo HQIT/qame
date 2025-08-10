@@ -62,6 +62,12 @@ class LLMAIService {
         temperature: config.temperature
       };
 
+      console.log('📤 [LLM AI Service] 请求配置:', {
+        endpoint: config.endpoint,
+        model: config.model,
+        hasApiKey: !!config.apiKey,
+        timeout: config.timeout || 'default'
+      });
       console.log('📤 [LLM AI Service] 请求体:', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch(config.endpoint, {

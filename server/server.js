@@ -74,6 +74,7 @@ class AIManager {
     this.activeMatches = new Set(); // 活跃的matches
     this.processingMatches = new Set(); // 正在处理的matches
     this.processedTurns = new Map(); // 记录已处理的轮次: matchId -> {turn, currentPlayer}
+    this.pendingAICalls = new Map(); // 正在进行的AI调用: matchId -> Promise
     this.apiServerUrl = process.env.API_SERVER_URL || 'http://api-server:8001';
     this.gameServerUrl = 'http://game-server:8000';
     this.internalServiceKey = process.env.INTERNAL_SERVICE_KEY || 'internal-service-secret-key-2024';
@@ -205,14 +206,20 @@ class AIManager {
       const currentAIPlayer = aiPlayers.find(ai => String(ai.seatIndex) === String(currentPlayer));
 
       if (currentAIPlayer && !gameState.ctx.gameover) {
-        // 检查节流：同一轮次若在1.5秒内已处理过则跳过，其余情况继续执行
         const matchId = match.id;
         const currentTurn = gameState.ctx.turn || 0;
+        
+        // 严格队列检查：如果该match有正在进行的AI调用，直接跳过
+        if (this.pendingAICalls.has(matchId)) {
+          console.log(`⏳ [AI Manager] Match ${matchId.substring(0, 8)} 有正在进行的AI调用，跳过`);
+          return;
+        }
+        
+        // 检查是否已处理过当前轮次
         const lastProcessed = this.processedTurns.get(matchId);
         const processedSameTurn = lastProcessed && lastProcessed.turn === currentTurn && lastProcessed.currentPlayer === currentPlayer;
-        const withinThrottle = processedSameTurn && (Date.now() - lastProcessed.timestamp < 1500);
-        if (withinThrottle) {
-          console.log(`⏭️ [AI Manager] 本轮已处理(节流): T${currentTurn} P${currentPlayer}`);
+        if (processedSameTurn) {
+          console.log(`✓ [AI Manager] 轮次 T${currentTurn} P${currentPlayer} 已处理完成`);
           return;
         }
 
@@ -231,7 +238,20 @@ class AIManager {
           return;
         }
 
-        await this.executeAIMove(match, currentAIPlayer, gameState);
+        // 创建AI调用Promise并记录到pending队列
+        const aiCallPromise = this.executeAIMove(match, currentAIPlayer, gameState)
+          .finally(() => {
+            // 无论成功失败，都要清除pending状态
+            this.pendingAICalls.delete(matchId);
+            console.log(`🧹 [AI Manager] 清除 ${matchId.substring(0, 8)} 的pending状态`);
+          });
+        
+        // 记录pending状态
+        this.pendingAICalls.set(matchId, aiCallPromise);
+        console.log(`📝 [AI Manager] 记录 ${matchId.substring(0, 8)} 为pending状态`);
+        
+        // 等待AI调用完成
+        await aiCallPromise;
 
         // 标记为已处理
         this.processedTurns.set(matchId, {
@@ -398,34 +418,38 @@ class AIManager {
           debug: false,
         });
 
-        // 添加连接事件监听
+        // 添加连接事件监听 - 只在轮到AI时执行一次移动
+        let moveExecuted = false;
         client.subscribe((state) => {
-          if (!resolved && state && state.ctx && !state.ctx.gameover) {
-            console.log(`📡 [AI Manager] 客户端状态更新: currentPlayer=${state.ctx.currentPlayer}`);
-            
-            // 确保客户端已连接并且有moves对象后再执行移动
-            if (client.moves && typeof client.moves.clickCell === 'function') {
-              console.log(`🎯 [AI Manager] 执行移动: clickCell(${move})`);
-              try {
-                client.moves.clickCell(move);
-                console.log(`✅ [AI Manager] 移动执行成功`);
-                
-                // 延迟一下再清理，确保移动被处理
+          if (!resolved && !moveExecuted && state && state.ctx && !state.ctx.gameover) {
+            // 检查是否轮到当前AI玩家
+            if (state.ctx.currentPlayer === playerIndex.toString()) {
+              console.log(`📡 [AI Manager] 轮到AI玩家 ${playerIndex} 行动`);
+              
+              // 确保客户端已连接并且有moves对象后再执行移动
+              if (client.moves && typeof client.moves.clickCell === 'function') {
+                try {
+                  moveExecuted = true; // 标记已执行，防止重复
+                  client.moves.clickCell(move);
+                  console.log(`✅ [AI Manager] AI执行移动: clickCell(${move})`);
+                  
+                  // 延迟一下再清理，确保移动被处理
+                  setTimeout(() => {
+                    clearTimeout(timeout);
+                    cleanup();
+                  }, 500);
+                } catch (moveError) {
+                  console.error('❌ [AI Manager] 执行moves.clickCell失败:', moveError.message);
+                  clearTimeout(timeout);
+                  cleanup();
+                }
+              } else {
+                console.warn('⚠️ [AI Manager] 客户端moves对象未准备好');
                 setTimeout(() => {
                   clearTimeout(timeout);
                   cleanup();
-                }, 500);
-              } catch (moveError) {
-                console.error('❌ [AI Manager] 执行moves.clickCell失败:', moveError.message);
-                clearTimeout(timeout);
-                cleanup();
+                }, 1000);
               }
-            } else {
-              console.warn('⚠️ [AI Manager] 客户端moves对象未准备好');
-              setTimeout(() => {
-                clearTimeout(timeout);
-                cleanup();
-              }, 1000);
             }
           }
         });

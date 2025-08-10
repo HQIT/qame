@@ -50,6 +50,8 @@ class AIClientManager {
             playerName: dbClient.player_name,
             gameType: dbClient.game_type,
             matchId: dbClient.match_id || 'lobby',
+            playerID: dbClient.player_id?.toString() || '1', // 添加playerID配置
+            credentials: dbClient.credentials || 'ai-credentials', // 添加credentials配置
             gameServerUrl: process.env.GAME_SERVER_URL || 'http://game-server:8000',
             aiConfig: dbClient.ai_config
           };

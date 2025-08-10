@@ -127,6 +127,19 @@ services:
     networks:
       - boardgame-network
     restart: unless-stopped
+  
+  llm-ai-service2:
+    image: localhost/hqit/boardgame-llm-ai-service:latest
+    expose:
+      - "3003"
+    env_file:
+      - .llm-ai-service.env
+    environment:
+      - NODE_ENV=development
+      - LLM_MODEL=ecnu-reasoner
+    networks:
+      - boardgame-network
+    restart: unless-stopped
 
   # PostgreSQL数据库 - 生产环境使用
   postgres:
