@@ -2,7 +2,8 @@
 // 使用SHA-256进行密码哈希，增加传输安全性
 
 // 使用统一的salt（与后端保持一致）
-const UNIFIED_SALT = 'your_fixed_salt_here'; // 应该与后端环境变量PASSWORD_SALT保持一致
+// 从构建时环境变量获取，需要在.env中设置 REACT_APP_PASSWORD_SALT
+const UNIFIED_SALT = process.env.REACT_APP_PASSWORD_SALT || 'fallback_salt_value';
 
 // 使用SHA-256哈希密码
 async function hashPassword(password) {

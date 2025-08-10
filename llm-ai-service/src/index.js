@@ -30,36 +30,36 @@ app.get('/health', (req, res) => {
 // 获取AI移动 - 标准接口
 app.post('/move', async (req, res) => {
   try {
-    const { game_type, match_id, player_id, game_state, valid_moves, metadata } = req.body;
+    const { game_id, match_id, player_id, G, ctx, metadata } = req.body;
     
     // 验证输入
-    if (!game_type || !game_state || !valid_moves) {
+    if (!game_id || !G || !player_id || !match_id) {
       return res.status(400).json({
         error: {
           code: 'INVALID_INPUT',
           message: '缺少必要参数',
-          details: '需要提供 game_type, game_state, valid_moves'
+          details: '需要提供 game_id, match_id, player_id, G'
         }
       });
     }
 
     // 检查是否支持该游戏
-    if (!gameHandlers[game_type]) {
+    if (!gameHandlers[game_id]) {
       return res.status(400).json({
         error: {
           code: 'UNSUPPORTED_GAME',
-          message: `不支持的游戏类型: ${game_type}`,
+          message: `不支持的游戏类型: ${game_id}`,
           details: `支持的游戏: ${Object.keys(gameHandlers).join(', ')}`
         }
       });
     }
 
-    console.log(`🎮 [LLM AI] 收到移动请求: ${game_type}, match: ${match_id}, player: ${player_id}`);
+    console.log(`🎮 [LLM AI] 收到移动请求: ${game_id}, match: ${match_id}, player: ${player_id}`);
     
     const startTime = Date.now();
     
     // 调用对应游戏的处理器
-    const move = await gameHandlers[game_type].getMove(llmAI, game_state, valid_moves, metadata);
+    const move = await gameHandlers[game_id].getMove(llmAI, G, metadata);
     
     const thinkingTime = Date.now() - startTime;
     
@@ -68,7 +68,7 @@ app.post('/move', async (req, res) => {
         error: {
           code: 'AI_ERROR',
           message: 'AI无法生成有效移动',
-          details: '请检查游戏状态和可用移动'
+          details: '请检查游戏状态'
         }
       });
     }
@@ -78,7 +78,6 @@ app.post('/move', async (req, res) => {
     // 返回标准格式响应
     res.json({
       move: move,
-      confidence: 0.8, // 可以根据LLM的实际响应调整
       thinking_time: thinkingTime,
       metadata: {
         algorithm: 'llm-based',

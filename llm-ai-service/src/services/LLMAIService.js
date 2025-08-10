@@ -1,11 +1,12 @@
-const fetch = require('node-fetch');
+// 使用Node.js 18+内置的fetch
+const fetch = globalThis.fetch;
 
 class LLMAIService {
   constructor() {
     this.defaultConfig = {
       endpoint: process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions',
       apiKey: process.env.LLM_API_KEY,
-      model: process.env.LLM_MODEL || 'gpt-3.5-turbo',
+      model: process.env.LLM_MODEL || 'ecnu-plus',
       maxTokens: parseInt(process.env.LLM_MAX_TOKENS) || 100,
       temperature: parseFloat(process.env.LLM_TEMPERATURE) || 0.7,
       timeout: parseInt(process.env.LLM_TIMEOUT) || 10000,
@@ -36,31 +37,40 @@ class LLMAIService {
       return -1;
     }
 
-    try {
+        try {
       console.log('🧠 [LLM AI Service] 调用LLM API...');
-      
+      console.log('📤 [LLM AI Service] 请求配置:', {
+        endpoint: config.endpoint,
+        model: config.model,
+        hasApiKey: !!config.apiKey,
+        timeout: config.timeout
+      });
+
+      const requestBody = {
+        model: config.model,
+        messages: [
+          {
+            role: 'system',
+            content: config.systemPrompt
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: config.maxTokens,
+        temperature: config.temperature
+      };
+
+      console.log('📤 [LLM AI Service] 请求体:', JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`,
         },
-        body: JSON.stringify({
-          model: config.model,
-          messages: [
-            {
-              role: 'system',
-              content: config.systemPrompt
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: config.maxTokens,
-          temperature: config.temperature
-        }),
-        signal: AbortSignal.timeout(config.timeout)
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {

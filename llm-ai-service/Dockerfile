@@ -6,7 +6,8 @@ WORKDIR /app
 # 复制package文件
 COPY package*.json ./
 
-# 安装依赖
+# 配置npm中国大陆加速镜像并安装依赖
+RUN npm config set registry https://registry.npmmirror.com/
 RUN npm install --only=production
 
 # 复制源代码

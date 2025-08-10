@@ -77,6 +77,8 @@ class AIService {
     }
   }
 
+
+
   /**
    * 通过AI客户端获取移动（新架构）
    * @param {Object} aiPlayer - AI玩家信息
@@ -100,15 +102,23 @@ class AIService {
     });
 
     try {
-      // 构建标准的/move接口请求
+      // 构建标准的/move接口请求（基于boardgame.io格式）
       const moveRequest = {
-        gameType: 'TicTacToe', // 根据实际游戏类型动态设置
-        gameState: gameState,
-        playerIndex: aiPlayer.seat_index,
-        playerSymbol: aiPlayer.seat_index === 0 ? 'X' : 'O'
+        match_id: gameState.G.matchId || 'unknown',
+        player_id: aiPlayer.id, // 使用真实的player ID
+        game_id: 'tic-tac-toe', // 使用games表中的ID
+        G: gameState.G, // 完整的游戏数据
+        ctx: gameState.ctx, // 游戏上下文
+        metadata: {
+          playerIndex: aiPlayer.seat_index,
+          playerSymbol: aiPlayer.seat_index === 0 ? 'X' : 'O'
+        }
       };
 
+      const timeout = parseInt(process.env.AI_SERVICE_TIMEOUT) || 30000;
       console.log('🧠 [AI Service] 调用AI客户端API...');
+      console.log('⏱️ [AI Service] 超时设置:', timeout + 'ms');
+      console.log('📤 [AI Service] 请求数据:', JSON.stringify(moveRequest, null, 2));
       
       const response = await fetch(aiClient.endpoint, {
         method: 'POST',
@@ -116,7 +126,7 @@ class AIService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(moveRequest),
-        signal: AbortSignal.timeout(10000) // 10秒超时
+        signal: AbortSignal.timeout(timeout) // 可配置超时时间
       });
 
       if (!response.ok) {
@@ -140,14 +150,14 @@ class AIService {
       }
       
       // 验证移动有效性
-      if (!isNaN(move) && move >= 0 && move <= 8 && gameState.cells[move] === null) {
+      if (!isNaN(move) && move >= 0 && move <= 8 && gameState.G.cells[move] === null) {
         console.log('✅ [AI Service] AI客户端选择有效位置:', move);
         return move;
       } else {
         console.error('❌ [AI Service] AI客户端返回无效位置:', { 
           move, 
           response: data, 
-          availablePositions: gameState.cells.map((cell, i) => cell === null ? i : null).filter(x => x !== null) 
+          availablePositions: gameState.G.cells.map((cell, i) => cell === null ? i : null).filter(x => x !== null) 
         });
         return -1;
       }

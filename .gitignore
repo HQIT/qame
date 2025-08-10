@@ -129,3 +129,4 @@ nginx/ssl/
 generate-ssl.sh
 cookies.txt
 test-*.js
+.llm-ai-service.env

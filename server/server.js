@@ -109,15 +109,18 @@ class AIManager {
       const matches = await this.getActiveMatches();
       const count = Array.isArray(matches) ? matches.length : 0;
       console.log(`[AI Manager] playing matches: ${count}`);
+      
       if (!matches || matches.length === 0) {
         console.log('🛌 [AI Manager] 无进行中比赛');
-        return;
-      }
-      for (const match of matches) {
-        if (!this.processingMatches.has(match.id)) {
-          await this.processMatch(match);
+      } else {
+        for (const match of matches) {
+          if (!this.processingMatches.has(match.id)) {
+            await this.processMatch(match);
+          }
         }
       }
+      
+      // 无论是否有matches都继续轮询
       this._scheduleNext(this.pollingInterval);
     } catch (err) {
       console.error('❌ [AI Manager] 轮询出错:', err);
@@ -339,7 +342,7 @@ class AIManager {
       }
 
       // 获取AI移动
-      const move = await aiService.getAIMove(aiPlayerInfo, gameState.G);
+      const move = await aiService.getAIMove(aiPlayerInfo, gameState);
       if (move === -1) {
         console.error(`❌ [AI Manager] AI未能选择有效移动`);
         // 将错误回传到Game状态，供前端或监控显示

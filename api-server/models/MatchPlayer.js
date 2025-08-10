@@ -224,22 +224,25 @@ class MatchPlayer {
     return result.rows.length > 0 ? result.rows[0] : null;
   }
 
-  // 根据用户ID和match ID查找玩家
+  // 根据用户ID和match ID查找玩家（通过统一玩家表关联）
   static async findByUserIdAndMatchId(userId, matchId) {
-    const result = await query(
-      'SELECT player_credentials, seat_index FROM match_players WHERE match_id = $1 AND user_id = $2',
-      [matchId, userId]
-    );
+    const result = await query(`
+      SELECT mp.player_credentials, mp.seat_index 
+      FROM match_players mp 
+      JOIN players p ON mp.player_id = p.id 
+      WHERE mp.match_id = $1 AND p.user_id = $2 AND p.player_type = 'human'
+    `, [matchId, userId]);
     return result.rows.length > 0 ? result.rows[0] : null;
   }
 
-  // 通过bgio_match_id和用户ID查找玩家
+  // 通过bgio_match_id和用户ID查找玩家（通过统一玩家表关联）
   static async findByBgioMatchIdAndUserId(bgioMatchId, userId) {
     const result = await query(`
       SELECT mp.player_credentials, mp.seat_index 
       FROM match_players mp 
       JOIN matches m ON mp.match_id = m.id 
-      WHERE m.bgio_match_id = $1 AND mp.user_id = $2
+      JOIN players p ON mp.player_id = p.id 
+      WHERE m.bgio_match_id = $1 AND p.user_id = $2 AND p.player_type = 'human'
     `, [bgioMatchId, userId]);
     return result.rows.length > 0 ? result.rows[0] : null;
   }
@@ -260,15 +263,16 @@ class MatchPlayer {
   // 查找已存在的AI玩家
   // findExistingAIPlayer方法已删除，不再需要处理left状态
 
-  // 更新玩家凭证
+  // 更新玩家凭证（通过统一玩家表关联）
   static async updatePlayerCredentials(matchId, userId, playerCredentials) {
-    // 只更新该match中该用户最新一条非left记录的凭证
+    // 通过player_id关联找到该match中该用户的记录
     const result = await query(`
       UPDATE match_players SET player_credentials = $1
       WHERE id = (
-        SELECT id FROM match_players 
-        WHERE match_id = $2 AND user_id = $3
-        ORDER BY joined_at DESC
+        SELECT mp.id FROM match_players mp
+        JOIN players p ON mp.player_id = p.id 
+        WHERE mp.match_id = $2 AND p.user_id = $3 AND p.player_type = 'human'
+        ORDER BY mp.joined_at DESC
         LIMIT 1
       )
       RETURNING *

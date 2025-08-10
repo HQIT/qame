@@ -7,15 +7,22 @@ class TicTacToeHandler {
   /**
    * 获取AI移动决策
    * @param {LLMAIService} llmAI - LLM AI服务实例
-   * @param {object} gameState - 游戏状态
-   * @param {array} validMoves - 有效移动列表
+   * @param {object} G - boardgame.io游戏数据
    * @param {object} metadata - 元数据
    * @returns {Promise<number>} 移动位置
    */
-  async getMove(llmAI, gameState, validMoves, metadata = {}) {
+  async getMove(llmAI, G, metadata = {}) {
     try {
+      // 计算有效移动
+      const validMoves = this.calculateValidMoves(G.cells);
+      
+      if (validMoves.length === 0) {
+        console.warn('⚠️ [井字棋] 没有有效移动');
+        return -1;
+      }
+      
       // 生成游戏状态描述的提示词
-      const prompt = this.generatePrompt(gameState, validMoves, metadata);
+      const prompt = this.generatePrompt(G, validMoves, metadata);
       
       console.log('🎯 [井字棋] 生成提示词:', prompt);
       
@@ -23,7 +30,7 @@ class TicTacToeHandler {
       const move = await llmAI.getAIMove(prompt);
       
       // 验证移动是否有效
-      if (!llmAI.isValidMove(move, validMoves)) {
+      if (!this.isValidMove(move, validMoves)) {
         console.warn(`⚠️ [井字棋] LLM返回无效移动 ${move}, 有效移动: ${validMoves}`);
         
         // 如果LLM返回无效移动，随机选择一个有效移动
@@ -53,14 +60,39 @@ class TicTacToeHandler {
   }
 
   /**
+   * 计算有效移动
+   * @param {array} cells - 棋盘状态数组
+   * @returns {array} 有效移动位置数组
+   */
+  calculateValidMoves(cells) {
+    const validMoves = [];
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] === null || cells[i] === undefined) {
+        validMoves.push(i);
+      }
+    }
+    return validMoves;
+  }
+
+  /**
+   * 验证移动是否有效
+   * @param {number} move - 移动位置
+   * @param {array} validMoves - 有效移动列表
+   * @returns {boolean} 是否有效
+   */
+  isValidMove(move, validMoves) {
+    return validMoves.includes(move);
+  }
+
+  /**
    * 生成LLM提示词
-   * @param {object} gameState - 游戏状态
+   * @param {object} G - boardgame.io游戏数据
    * @param {array} validMoves - 有效移动列表
    * @param {object} metadata - 元数据
    * @returns {string} 提示词
    */
-  generatePrompt(gameState, validMoves, metadata) {
-    const { cells } = gameState;
+  generatePrompt(G, validMoves, metadata) {
+    const { cells } = G;
     const { move_number = 0 } = metadata;
     
     // 将棋盘状态转换为可读格式

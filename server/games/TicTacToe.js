@@ -67,7 +67,7 @@ const TicTacToe = {
           delete G.aiError;
         }
         
-        console.log('游戏已重新开始，棋盘状态:', G.cells);
+        console.log('🔄 游戏已重新开始');
       },
       // 允许在游戏结束后执行此移动
       ignoreStaleStateID: true,
@@ -102,28 +102,18 @@ const TicTacToe = {
       return; // 游戏未结束
     }
     
-    console.log('服务器端检查游戏结束状态:', { cells: G.cells, currentPlayer: ctx.currentPlayer });
-    
-    // 直接检查每个玩家是否获胜（更可靠的方法）
+    // 检查每个玩家是否获胜
     for (let player of ['0', '1']) {
-      console.log(`检查玩家 ${player} 是否获胜，类型: ${typeof player}`);
-      console.log('棋盘状态:', G.cells);
-      console.log('棋盘元素类型:', G.cells.map(cell => typeof cell));
-      
       const isWinner = IsPlayerVictory(G.cells, player);
-      console.log(`玩家 ${player} 获胜检查结果: ${isWinner}`);
-      
       if (isWinner) {
-        console.log(`服务器端：玩家 ${player} 获胜!`);
-        console.log('获胜时的棋盘状态:', G.cells);
+        console.log(`🏆 服务器端：玩家 ${player} 获胜!`);
         return { winner: player };
       }
     }
     
     // 检查是否平局
     if (IsDraw(G.cells)) {
-      console.log('服务器端：游戏平局!');
-      console.log('平局时的棋盘状态:', G.cells);
+      console.log('🤝 服务器端：游戏平局!');
       return { draw: true };
     }
     
