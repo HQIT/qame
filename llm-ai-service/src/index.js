@@ -21,7 +21,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     service: 'llm-ai-service',
     version: '1.0.0',
-    supported_games: ['tic-tac-toe'],
+    supported_games: [],
     max_concurrent_games: 10,
     description: '基于LLM的AI游戏客户端 - 外部AI开发参考示例'
   });

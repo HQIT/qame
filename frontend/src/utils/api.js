@@ -97,8 +97,6 @@ export const api = {
   }),
   deleteAIClient: (clientId) => apiCall(`/ai-manager/api/clients/${clientId}`, { method: 'DELETE' }),
   deleteAIPlayer: (playerId) => apiCall(`/ai-manager/api/players/${playerId}`, { method: 'DELETE' }),
-  getAvailableGames: () => apiCall('/games/api/games'),
-  
   // AI相关（兼容旧接口）
   getAITypes: (gameId) => apiCall(`/api/ai/types${gameId ? `?gameId=${gameId}` : ''}`),
   callAI: (aiTypeId, gameState, config) => apiCall('/api/ai/move', {
@@ -109,18 +107,6 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ aiTypeId })
   }),
-
-  // AI管理相关
-  getAIProviders: () => apiCall('/api/admin/ai-providers'),
-  createAIProvider: (providerData) => apiCall('/api/admin/ai-providers', {
-    method: 'POST',
-    body: JSON.stringify(providerData)
-  }),
-  updateAIProvider: (providerId, providerData) => apiCall(`/api/admin/ai-providers/${providerId}`, {
-    method: 'PUT',
-    body: JSON.stringify(providerData)
-  }),
-  deleteAIProvider: (providerId) => apiCall(`/api/admin/ai-providers/${providerId}`, { method: 'DELETE' }),
   
   getAdminAITypes: (gameId) => apiCall(`/api/admin/ai-types${gameId ? `?gameId=${gameId}` : ''}`),
   createAIType: (typeData) => apiCall('/api/admin/ai-types', {
@@ -135,6 +121,9 @@ export const api = {
 
   // 游戏相关
   getGames: () => apiCall('/api/games'),
+
+  // Player相关
+  getMyPlayer: () => apiCall('/api/players/me'),
 
   // Match相关
   getMatches: (filters = {}) => {
@@ -156,9 +145,9 @@ export const api = {
   cancelMatch: (matchId) => apiCall(`/api/matches/${matchId}/cancel`, { method: 'POST' }),
   checkGameStatus: (matchId) => apiCall(`/api/matches/${matchId}/check-game-status`, { method: 'POST' }),
   getCredentials: (matchId) => apiCall(`/api/matches/${matchId}/credentials`),
+  syncMatches: () => apiCall('/api/matches/sync', { method: 'POST' }),
 
   // 在线用户相关
-  sendHeartbeat: () => apiCall('/api/online/heartbeat', { method: 'POST' }),
   getOnlineUsers: () => apiCall('/api/online/users'),
   getOnlineStats: () => apiCall('/api/online/stats'),
   setOffline: () => apiCall('/api/online/offline', { method: 'POST' })

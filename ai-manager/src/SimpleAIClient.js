@@ -28,10 +28,7 @@ class SimpleAIClient {
     this.gameState = null;
     this.logs = [];
     this.createdAt = new Date();
-    
-    // 心跳定时器
-    this.heartbeatInterval = null;
-    
+
     this.log('info', `AI客户端已创建: ${this.playerName}`);
   }
 
@@ -79,8 +76,7 @@ class SimpleAIClient {
         this.log('info', `已连接到游戏: ${this.matchId}, 玩家ID: ${this.playerID}`);
       }
 
-      // 启动心跳
-      this.startHeartbeat();
+
 
     } catch (error) {
       this.status = 'error';
@@ -215,43 +211,7 @@ class SimpleAIClient {
     }
   }
 
-  /**
-   * 启动心跳
-   */
-  startHeartbeat() {
-    try {
-      // 清除已有的心跳定时器
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-      }
-      
-      // 立即发送一次心跳
-      this.sendHeartbeat();
-      
-      // 每30秒发送一次心跳
-      this.heartbeatInterval = setInterval(() => {
-        this.sendHeartbeat();
-      }, 30000);
-      
-      this.log('info', '心跳已启动');
-    } catch (error) {
-      this.log('error', `启动心跳失败: ${error.message}`);
-    }
-  }
 
-  /**
-   * 发送心跳
-   */
-  async sendHeartbeat() {
-    try {
-      // 更新数据库中的last_seen字段
-      const AIClientModel = require('./models/AIClient');
-      await AIClientModel.updateHeartbeat(this.id);
-      this.log('debug', '心跳已发送');
-    } catch (error) {
-      this.log('error', `发送心跳失败: ${error.message}`);
-    }
-  }
 
   /**
    * 断开连接
@@ -261,11 +221,7 @@ class SimpleAIClient {
       this.status = 'disconnecting';
       this.log('info', 'AI客户端断开连接');
       
-      // 停止心跳
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-        this.heartbeatInterval = null;
-      }
+
       
       if (this.socket) {
         this.socket.disconnect();

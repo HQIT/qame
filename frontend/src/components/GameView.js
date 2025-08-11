@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Client } from 'boardgame.io/react';
 import { SocketIO } from 'boardgame.io/multiplayer'
-import TicTacToe from '../games/TicTacToe';
+import { TicTacToe, Gomoku } from '@qame/games';
 import TicTacToeBoard from '../games/TicTacToeBoard';
+import GomokuBoard from '../games/GomokuBoard';
 import { api } from '../utils/api';
 
 const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onReturnToLobby }) => {
   const [matchInfo, setMatchInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [connectionError, setConnectionError] = useState(null);
-  const [gameClientError, setGameClientError] = useState(null);
   const [playerCredentials, setPlayerCredentials] = useState(null);
   const [credentialsLoading, setCredentialsLoading] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
   const clientRef = useRef(null);
   // 获取match信息
   useEffect(() => {
@@ -51,14 +49,11 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
         if (response.code === 200) {
           console.log('✅ 获取playerCredentials成功:', response.data);
           setPlayerCredentials(response.data.playerCredentials);
-          setConnectionError(null);
         } else {
           console.error('❌ 获取playerCredentials失败:', response.message);
-          setConnectionError(`获取credentials失败: ${response.message}`);
         }
       } catch (error) {
         console.error('❌ 获取playerCredentials出错:', error);
-        setConnectionError(`获取credentials出错: ${error.message || error}`);
       } finally {
         setCredentialsLoading(false);
       }
@@ -84,45 +79,37 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
         willPassPropsAtRender: true
       });
 
+      // 根据游戏名称选择对应的游戏和棋盘组件
+      const getGameConfig = () => {
+        switch (gameName) {
+          case 'gomoku':
+            return {
+              game: Gomoku,
+              board: (props) => <GomokuBoard {...props} matchInfo={matchInfo} />
+            };
+          case 'tic-tac-toe':
+          default:
+            return {
+              game: TicTacToe,
+              board: (props) => <TicTacToeBoard {...props} matchInfo={matchInfo} />
+            };
+        }
+      };
+
+      const gameConfig = getGameConfig();
+
       const ClientComponent = Client({
-        game: TicTacToe,
-        board: (props) => <TicTacToeBoard {...props} matchInfo={matchInfo} />,
+        game: gameConfig.game,
+        board: gameConfig.board,
         debug: false, // 关闭debug模式以减少日志输出
         multiplayer: SocketIO({ 
           server: window.location.origin
-        }),
-        // 详细错误处理和状态显示
-        onConnect: () => {
-          console.log('✅ boardgame.io 连接成功');
-          setConnectionError(null);
-          setGameClientError(null);
-          setIsConnected(true);
-        },
-        onDisconnect: () => {
-          console.log('❌ boardgame.io 连接断开');
-          setConnectionError('🔌 与游戏服务器的连接已断开 - 检查网络或重新进入游戏');
-          setIsConnected(false);
-        },
-        onConnectionError: (error) => {
-          console.error('❌ boardgame.io 连接错误:', error);
-          const errorMsg = `🚨 boardgame.io连接失败: ${error.message || error}`;
-          setConnectionError(errorMsg);
-          setIsConnected(false);
-        },
-        onUpdateError: (error) => {
-          console.error('❌ boardgame.io 更新错误:', error);
-          setConnectionError(`🔄 游戏状态更新失败: ${error.message || error}`);
-        },
-        onSyncError: (error) => {
-          console.error('❌ boardgame.io 同步错误:', error);
-          setConnectionError(`🔄 游戏同步失败: ${error.message || error}`);
-        }
+        })
       });
 
       return ClientComponent;
     } catch (error) {
       console.error('❌ 创建GameClient失败:', error);
-      setGameClientError(`客户端创建失败: ${error.message}`);
       return null;
     }
   }, [matchID, playerID, playerName, playerCredentials, credentialsLoading, matchInfo]);
@@ -132,10 +119,6 @@ const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onR
     return () => {
       // 清理客户端引用
       clientRef.current = null;
-      // 重置连接状态
-      setIsConnected(false);
-      setConnectionError(null);
-      setGameClientError(null);
     };
   }, []);
 

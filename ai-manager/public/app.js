@@ -28,19 +28,19 @@ async function loadInitialData() {
 
 async function loadAvailableGames() {
     try {
-        // 从game-server获取支持的游戏列表
-        const response = await fetch('/games/api/games');
+        // 从API Server获取游戏列表（包含元信息和实际可玩状态）
+        const response = await fetch('/api/games');
         const result = await response.json();
         
         if (result.code === 200) {
-            availableGames = result.data || [];
+            // 提取游戏ID列表
+            availableGames = result.data.map(game => game.id) || [];
         } else {
-            // 如果无法获取，使用默认游戏列表
-            availableGames = ['TicTacToe'];
+            availableGames = [];
         }
     } catch (error) {
         console.error('加载游戏列表失败:', error);
-        availableGames = ['TicTacToe']; // 默认游戏
+        availableGames = [];
     }
 }
 

@@ -411,7 +411,7 @@ class AIClientManager {
       systemPrompt: config.systemPrompt || '你是一个聪明的游戏AI助手。',
       
       // 能力配置
-      supportedGames: config.supportedGames || ['tic-tac-toe'],
+      supportedGames: config.supportedGames || [],
       maxComplexity: config.maxComplexity || 'medium',
       maxPlayers: config.maxPlayers || 4,
       maxBoardSize: config.maxBoardSize || 100,

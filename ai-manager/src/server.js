@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const { AIClientManager } = require('./AIClientManager');
+const { AIClientManager } = require('./AIClientManager.js');
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -21,7 +21,8 @@ app.get('/', (req, res) => {
 });
 
 // API路由
-app.use('/api', require('./routes/api'));
+const apiRoutes = require('./routes/api.js');
+app.use('/api', apiRoutes);
 
 // 将AI管理器传递给路由
 app.locals.aiManager = aiManager;

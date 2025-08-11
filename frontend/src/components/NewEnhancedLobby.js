@@ -16,8 +16,9 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   const [aiPlayers, setAiPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
-  const [selectedGame, setSelectedGame] = useState('tic-tac-toe');
+  const [selectedGame, setSelectedGame] = useState('');
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // 获取数据
   useEffect(() => {
@@ -73,6 +74,14 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
       if (gamesResponse.code === 200) {
         setGames(gamesResponse.data);
+        // 如果没有选择游戏且有可用游戏，选择第一个
+        if (gamesResponse.data.length > 0 && !selectedGame) {
+          setSelectedGame(gamesResponse.data[0].id);
+        }
+        // 如果当前选择的游戏不在新获取的游戏列表中，重置选择
+        if (selectedGame && !gamesResponse.data.some(game => game.id === selectedGame)) {
+          setSelectedGame(gamesResponse.data.length > 0 ? gamesResponse.data[0].id : '');
+        }
       }
 
       if (aiPlayersResponse.code === 200) {
@@ -130,25 +139,26 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     }
   };
 
-  // 加入Match作为人类玩家
-  const joinAsHuman = async (matchId) => {
-    try {
-      const response = await api.addPlayerToMatch(matchId, {
-        playerType: 'human',
-        playerName: currentUser?.username
-      });
 
+  // 手动同步 boardgame.io 数据
+  const handleSyncMatches = async () => {
+    if (syncing) return;
+    
+    setSyncing(true);
+    try {
+      const response = await api.syncMatches();
       if (response.code === 200) {
-        console.log('加入成功:', response.data);
-        success('成功加入游戏！请等待其他玩家加入或创建者开始游戏');
-        // 刷新match列表，显示最新状态
+        success('数据同步完成！');
+        // 同步完成后刷新列表
         await fetchData();
       } else {
-        error(`加入失败: ${response.message}`);
+        error('同步失败: ' + response.message);
       }
-    } catch (error) {
-      console.error('加入match失败:', error);
-      error('加入match失败，请检查网络连接');
+    } catch (err) {
+      console.error('同步失败:', err);
+      error('同步失败，请检查网络连接');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -161,10 +171,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       const response = await api.addPlayerToMatch(matchId, {
-        playerType: 'ai',
-        playerName: aiPlayer.player_name,
-        seatIndex: seatIndex,
-        aiPlayerId: aiPlayerId
+        playerId: aiPlayerId,  // aiPlayerId 实际上就是 AI 在 players 表中的 id
+        seatIndex: seatIndex
       });
 
       if (response.code === 200) {
@@ -324,7 +332,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     
     if (selectedOption === '👤 我要加入') {
       // 玩家自己加入
-      await joinAsHumanWithSeat(matchId, seatIndex);
+      await joinAsHuman(matchId, seatIndex);
     } else if (selectedOption === '🤖 添加AI') {
       // 添加AI
       await addOnlineAIToMatchWithSeat(matchId, seatIndex);
@@ -332,11 +340,15 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   };
 
   // 加入指定座位作为人类玩家
-  const joinAsHumanWithSeat = async (matchId, seatIndex) => {
+  const joinAsHuman = async (matchId, seatIndex) => {
     try {
+      // 使用已缓存的player信息，避免重复API调用
+      if (!currentUser?.player?.id) {
+        throw new Error('用户玩家信息不可用，请重新登录');
+      }
+      
       const response = await api.addPlayerToMatch(matchId, {
-        playerType: 'human',
-        playerName: currentUser?.username,
+        playerId: currentUser.player.id,
         seatIndex: seatIndex
       });
 
@@ -391,50 +403,10 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     }
   };
 
-  // 添加AI玩家到Match（任意空座位）
-  const addOnlineAIToMatch = async (matchId) => {
-    try {
-      // 检查是否有可用的AI玩家
-      if (aiPlayers.length === 0) {
-        warning('没有可用的AI玩家，请先在AI管理中心创建AI玩家');
-        return;
-      }
-
-      // 让用户选择AI玩家
-      let selectedPlayer = aiPlayers[0];
-
-      if (aiPlayers.length > 1) {
-        const options = aiPlayers.map((player, i) => 
-          `${i + 1}. ${player.player_name} (${player.client_name})`
-        );
-        
-        const idx = await showSelect({ 
-          title: '选择要加入的AI玩家', 
-          options 
-        });
-        
-        if (idx !== null && aiPlayers[idx]) {
-          selectedPlayer = aiPlayers[idx];
-        } else {
-          return; // 用户取消选择
-        }
-      }
-
-      // 添加AI玩家到任意空座位
-      await addAIPlayer(matchId, selectedPlayer.id);
-
-    } catch (e) {
-      console.error(e);
-      error('添加AI失败');
-    }
-  };
-
   // 渲染Match卡片
   const renderMatchCard = (match) => {
     const playerInMatch = getPlayerInMatch(match);
     const isMatchCreator = isCreator(match);
-    const canJoin = !playerInMatch && match.currentPlayerCount < match.max_players && match.status === 'waiting';
-    const canAddAI = isMatchCreator && match.currentPlayerCount < match.max_players && match.status === 'waiting';
     const canStart = isMatchCreator && match.currentPlayerCount >= match.min_players && match.status === 'waiting';
 
     return (
@@ -634,7 +606,37 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>🎮 游戏大厅</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <h1 style={{ margin: 0 }}>🎮 游戏大厅</h1>
+        <button
+          onClick={handleSyncMatches}
+          disabled={syncing}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: syncing ? '#6c757d' : '#17a2b8',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: syncing ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          {syncing ? (
+            <>
+              <span>🔄</span>
+              <span>同步中...</span>
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              <span>同步数据</span>
+            </>
+          )}
+        </button>
+      </div>
       
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: '20px', alignItems: 'start' }}>
         {/* 左侧配置面板 */}
@@ -675,11 +677,13 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                 marginBottom: '10px'
               }}
             >
-              {games.map(game => (
+              {Array.isArray(games) && games.length > 0 ? games.map(game => (
                 <option key={game.id} value={game.id}>
-                  {game.name}
+                  {game.displayName || game.name}
                 </option>
-              ))}
+              )) : (
+                <option value="">暂无可用游戏</option>
+              )}
             </select>
           </div>
 

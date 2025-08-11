@@ -1,26 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 /**
  * 井字棋游戏界面组件
  * 
- * ⚠️ 重要说明：此文件经过精心调试，任何修改都必须经过充分测试！
- * 如果其他AI想要修改，请先理解boardgame.io的完整工作流程。
- * 
- * 🔧 boardgame.io 组件机制：
- * 1. moves 对象包含所有可用的移动函数
- * 2. 调用 moves.clickCell(id) 时，boardgame.io 会自动将 id 作为数组传递给游戏逻辑
- * 3. 游戏逻辑中的函数必须接收 ...args 参数来获取传递的值
+ * 统一处理所有玩家，不区分AI和人类玩家
  * 
  * @param {Object} G - 游戏状态对象
  * @param {Object} ctx - 游戏上下文对象
  * @param {Object} moves - 可用的移动函数
  * @param {string} playerID - 当前玩家ID
  * @param {boolean} isActive - 当前玩家是否处于活动状态
- * @param {boolean} enableAI - 是否启用AI Bot（兼容旧版本）
- * @param {string} aiType - AI类型（兼容旧版本）
- * @param {Object} setupData - 设置数据（新版本）
+ * @param {Object} setupData - 设置数据
  */
-const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, aiType = 'none', setupData, matchInfo }) => {
+const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, setupData, matchInfo }) => {
   // 渲染调试信息（仅在开发模式显示）
   if (process.env.NODE_ENV === 'development') {
     console.log('[Board] 渲染', { 
@@ -30,69 +22,8 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
     });
   }
 
-  // 基于游戏状态或matchInfo判断当前玩家是否为AI（G.aiPlayers 为空时兜底）
-  let isAIPlayer = false;
-  let currentAiType = 'none';
-  const numericPlayerId = parseInt(playerID);
-  if (G.aiPlayers && Array.isArray(G.aiPlayers)) {
-    isAIPlayer = G.aiPlayers.some(ai => ai.seat_index === numericPlayerId);
-    if (isAIPlayer) {
-      currentAiType = G.aiPlayers.find(ai => ai.seat_index === numericPlayerId)?.ai_type_name || 'traditional';
-    }
-  } else if (matchInfo && Array.isArray(matchInfo.players)) {
-    const me = matchInfo.players.find(p => p.seatIndex === numericPlayerId);
-    if (me && me.isAI) {
-      isAIPlayer = true;
-      currentAiType = 'traditional';
-    }
-  }
   // 以回合为准，避免 isActive 异常导致无法行动
   const isMyTurn = playerID != null && playerID.toString() === ctx.currentPlayer && !ctx.gameover;
-  const isCurrentPlayerAI = isAIPlayer && isMyTurn;
-  
-  // AI配置调试信息（仅在开发模式显示）
-  if (process.env.NODE_ENV === 'development' && isAIPlayer) {
-    console.log('[Board] AI配置:', { playerID, currentAiType });
-  }
-  
-  // 前端不执行AI逻辑，只被动接收状态变化
-  // AI逻辑完全由后端AI Manager处理
-  
-  // 根据AI类型选择对应的Bot组件
-  const getBotComponent = () => {
-    console.log('�� 选择Bot组件:', {
-      isAIPlayer,
-      currentAiType,
-      shouldShowBot: isAIPlayer
-    });
-    
-    if (!isAIPlayer) {
-      console.log('🎮 不显示Bot组件');
-      return null;
-    }
-    
-    // AI逻辑已移至服务端ai-manager处理，客户端仅显示AI状态
-    if (isMyTurn && !ctx.gameover) {
-      return (
-        <div style={{
-          textAlign: 'center',
-          padding: '15px',
-          backgroundColor: '#e3f2fd',
-          border: '1px solid #2196f3',
-          borderRadius: '8px',
-          margin: '10px 0'
-        }}>
-          <div style={{ fontSize: '18px', marginBottom: '5px' }}>🤖</div>
-          <div style={{ color: '#1976d2', fontWeight: 'bold' }}>AI正在思考中...</div>
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-            由服务端AI处理 ({currentAiType})
-          </div>
-        </div>
-      );
-    }
-    
-    return null;
-  };
 
   /**
    * 处理格子点击事件
@@ -120,8 +51,7 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
       isMyTurn &&
       playerID !== null &&
       G.cells &&
-      G.cells[id] === null &&
-      !isAIPlayer // 只有人类玩家才能点击
+      G.cells[id] === null
     ) {
       moves.clickCell(id);
     }
@@ -150,32 +80,11 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
   } else {
     const currentPlayerSymbol = getPlayerSymbol(ctx.currentPlayer);
     
-    // 根据AI类型显示不同的标签
-    const getAILabel = () => {
-      if (!isCurrentPlayerAI) return null;
-      
-      switch (currentAiType) {
-        case 'traditional':
-          return <span style={{ marginLeft: '10px', fontSize: '1rem', color: '#FF9800' }}>
-            🤖 (传统AI)
-          </span>;
-        case 'llm':
-          return <span style={{ marginLeft: '10px', fontSize: '1rem', color: '#9C27B0' }}>
-            🧠 (LLM Bot)
-          </span>;
-        default:
-          return <span style={{ marginLeft: '10px', fontSize: '1rem', color: '#FF9800' }}>
-            🤖 (AI Bot)
-          </span>;
-      }
-    };
-    
     gameStatus = (
       <div style={{ textAlign: 'center', fontSize: '1.2rem', margin: '2rem 0' }}>
         当前玩家: <span style={{ color: getPlayerColor(ctx.currentPlayer) }}>
           {currentPlayerSymbol}
         </span>
-        {getAILabel()}
       </div>
     );
   }
@@ -196,11 +105,6 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
         ) : (
           <div>
             <h3>当前玩家: {ctx.currentPlayer}</h3>
-            {isCurrentPlayerAI && (
-              <div style={{ color: '#FF9800', fontSize: '14px' }}>
-                🤖 AI正在思考...
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -233,11 +137,8 @@ const TicTacToeBoard = ({ G, ctx, moves, playerID, isActive, enableAI = false, a
           </button>
         ))}
       </div>
-
-      {/* AI组件 */}
-      {getBotComponent()}
     </div>
   );
 };
 
-export default TicTacToeBoard; 
+export default TicTacToeBoard;

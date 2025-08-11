@@ -3,15 +3,19 @@ FROM dockerpull.pw/node:18-alpine AS builder
 
 WORKDIR /app
 
-# 复制package.json
-COPY package*.json ./
+# 复制共享游戏包
+COPY packages/ ./packages/
+
+# 复制frontend的package.json
+COPY frontend/package*.json ./
 
 # 安装所有依赖
 RUN npm config set registry https://registry.npmmirror.com/
 RUN npm install
 
-# 复制源代码
-COPY . .
+# 复制frontend源代码
+COPY frontend/src ./src
+COPY frontend/public ./public
 
 # 构建应用 - 使用构建参数
 ARG REACT_APP_SERVER

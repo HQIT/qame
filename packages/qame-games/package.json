@@ -1,0 +1,22 @@
+{
+  "name": "@qame/games",
+  "version": "1.0.0",
+  "description": "Built-in games for QAME platform",
+
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./TicTacToe": "./src/TicTacToe.js",
+    "./Gomoku": "./src/Gomoku.js"
+  },
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "lint": "echo \"No linting yet\""
+  },
+  "peerDependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "keywords": ["qame", "boardgame", "games"],
+  "author": "QAME Platform",
+  "license": "MIT"
+}

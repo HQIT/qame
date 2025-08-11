@@ -82,29 +82,6 @@ const OnlinePlayers = ({ currentUser }) => {
     }
   };
 
-  // 发送心跳保持在线状态
-  const sendHeartbeat = async () => {
-    try {
-      const response = await api.sendHeartbeat();
-      
-      // 检查响应状态码
-      if (response.code !== 200) {
-        console.error('❌ 心跳API返回错误:', response);
-        throw new Error(`心跳失败: ${response.message}`);
-      }
-      
-      console.log('✅ 心跳发送成功:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ 发送心跳失败:', error);
-      // 如果是认证错误，可能需要重新登录
-      if (error.status === 401) {
-        console.warn('⚠️ 心跳认证失败，可能需要重新登录');
-      }
-      throw error;
-    }
-  };
-
   // 组件挂载时获取数据并开始心跳（只有在用户已登录时）
   useEffect(() => {
     if (!currentUser) {
@@ -113,13 +90,9 @@ const OnlinePlayers = ({ currentUser }) => {
     }
 
     fetchOnlineUsers();
-    sendHeartbeat();
 
     // 定时获取在线用户列表（30秒）
     const fetchInterval = setInterval(fetchOnlineUsers, 30000);
-    
-    // 定时发送心跳（2分钟）
-    const heartbeatInterval = setInterval(sendHeartbeat, 120000);
 
     // 页面关闭时通知服务器下线
     const handleBeforeUnload = () => {
@@ -134,7 +107,6 @@ const OnlinePlayers = ({ currentUser }) => {
 
     return () => {
       clearInterval(fetchInterval);
-      clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // 组件卸载时设置离线状态
       if (currentUser) {

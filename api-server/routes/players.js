@@ -8,6 +8,34 @@ const { authenticateToken } = require('../middleware/auth');
  * 这个API统一处理所有类型的玩家（人类、AI）
  */
 
+// 获取当前用户的player信息
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const player = await Player.getByUserId(req.user.id);
+    
+    if (!player) {
+      return res.status(404).json({
+        code: 404,
+        message: '当前用户没有对应的玩家记录',
+        data: null
+      });
+    }
+    
+    res.json({
+      code: 200,
+      message: '获取当前用户玩家信息成功',
+      data: player
+    });
+  } catch (error) {
+    console.error('获取当前用户玩家信息失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '服务器内部错误',
+      data: null
+    });
+  }
+});
+
 // 获取所有玩家
 router.get('/', authenticateToken, async (req, res) => {
   try {

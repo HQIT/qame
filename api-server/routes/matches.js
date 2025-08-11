@@ -143,15 +143,20 @@ router.delete('/:matchId', controller.deleteMatch);
 // 添加玩家到match
 router.post('/:matchId/players', controller.addPlayer);
 
+// 手动同步 boardgame.io 数据
+router.post('/sync', controller.syncMatches);
+
 // 移除玩家
 router.delete('/:matchId/players/:playerId', controller.removePlayer);
-// 管理员强制移除玩家
+// 管理员强制移除玩家 - 使用统一的 removePlayer 接口
 router.post('/:matchId/force-leave', (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ code: 403, message: '只有管理员可以强制玩家离开游戏', data: null });
   }
+  // 将 POST 请求转换为 DELETE 请求的参数格式
+  req.params.playerId = req.body.playerId;
   next();
-}, controller.forceLeavePlayer);
+}, controller.removePlayer);
 
 // 开始match
 router.post('/:matchId/start', async (req, res) => {

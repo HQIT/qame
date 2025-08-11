@@ -5,82 +5,7 @@ class MatchPlayer {
     Object.assign(this, data);
   }
 
-  // 添加玩家到match
-  static async addPlayer(data) {
-    const { 
-      matchId, 
-      seatIndex, 
-      playerType, 
-      userId = null, 
-      playerName, 
-      aiPlayerId = null
-    } = data;
 
-    // 防止重复加入同一座位
-    const existingPlayer = await query(`
-      SELECT * FROM match_players
-      WHERE match_id = $1 AND seat_index = $2 AND status != 'left'
-    `, [matchId, seatIndex]);
-
-    if (existingPlayer.rows.length > 0) {
-      throw new Error('Seat already taken');
-    }
-
-    // 验证数据
-    if (playerType === 'human' && !userId) {
-      throw new Error('Human player must have userId');
-    }
-    if (playerType === 'ai' && !aiPlayerId) {
-      throw new Error('AI player must have aiPlayerId');
-    }
-
-    // 获取或创建unified player记录
-    let playerId;
-    if (playerType === 'human') {
-      // 查找现有的human player记录
-      const playerResult = await query(`
-        SELECT id FROM players WHERE user_id = $1 AND player_type = 'human'
-      `, [userId]);
-      
-      if (playerResult.rows.length > 0) {
-        playerId = playerResult.rows[0].id;
-      } else {
-        // 创建新的human player记录
-        const newPlayerResult = await query(`
-          INSERT INTO players (player_name, player_type, user_id, status)
-          VALUES ($1, 'human', $2, 'active')
-          RETURNING id
-        `, [playerName, userId]);
-        playerId = newPlayerResult.rows[0].id;
-      }
-    } else if (playerType === 'ai') {
-      // 查找现有的AI player记录
-      const playerResult = await query(`
-        SELECT id FROM players WHERE ai_player_id = $1 AND player_type = 'ai'
-      `, [aiPlayerId]);
-      
-      if (playerResult.rows.length > 0) {
-        playerId = playerResult.rows[0].id;
-      } else {
-        // 创建新的AI player记录
-        const newPlayerResult = await query(`
-          INSERT INTO players (player_name, player_type, ai_player_id, status)
-          VALUES ($1, 'ai', $2, 'active')
-          RETURNING id
-        `, [playerName, aiPlayerId]);
-        playerId = newPlayerResult.rows[0].id;
-      }
-    }
-
-    // 插入match_players记录（兼容新旧字段结构）
-    const result = await query(`
-      INSERT INTO match_players (match_id, seat_index, player_type, player_id, player_name)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [matchId, seatIndex, playerType, playerId, playerName]);
-
-    return new MatchPlayer(result.rows[0]);
-  }
 
   // 获取match的所有玩家
   static async findByMatchId(matchId) {
@@ -253,31 +178,57 @@ class MatchPlayer {
       SELECT m.id as match_id, m.game_id, mp.seat_index
       FROM match_players mp
       JOIN matches m ON mp.match_id = m.id
-      WHERE mp.user_id = $1 
+      JOIN players p ON mp.player_id = p.id
+      WHERE p.user_id = $1 
       AND mp.status = 'joined' 
       AND m.status IN ('waiting', 'playing')
     `, [userId]);
     return result.rows;
   }
 
-  // 查找已存在的AI玩家
-  // findExistingAIPlayer方法已删除，不再需要处理left状态
-
-  // 更新玩家凭证（通过统一玩家表关联）
-  static async updatePlayerCredentials(matchId, userId, playerCredentials) {
-    // 通过player_id关联找到该match中该用户的记录
+  // 查找玩家的活跃matches（统一接口）
+  static async findActiveMatchesByPlayerId(playerId) {
     const result = await query(`
-      UPDATE match_players SET player_credentials = $1
-      WHERE id = (
-        SELECT mp.id FROM match_players mp
-        JOIN players p ON mp.player_id = p.id 
-        WHERE mp.match_id = $2 AND p.user_id = $3 AND p.player_type = 'human'
-        ORDER BY mp.joined_at DESC
-        LIMIT 1
-      )
+      SELECT m.id as match_id, m.game_id, mp.seat_index
+      FROM match_players mp
+      JOIN matches m ON mp.match_id = m.id
+      WHERE mp.player_id = $1 
+      AND mp.status = 'joined' 
+      AND m.status IN ('waiting', 'playing')
+    `, [playerId]);
+    return result.rows;
+  }
+
+  // 通过player_id添加玩家（统一接口）
+  static async addPlayerById(matchId, playerId, seatIndex) {
+    // 获取玩家信息
+    const playerResult = await query('SELECT * FROM players WHERE id = $1', [playerId]);
+    if (playerResult.rows.length === 0) {
+      throw new Error('Player not found');
+    }
+    const player = playerResult.rows[0];
+
+    // 检查座位是否可用
+    if (seatIndex !== undefined && seatIndex !== null) {
+      const isSeatAvailable = await this.isSeatAvailable(matchId, seatIndex);
+      if (!isSeatAvailable) {
+        throw new Error('Seat already taken');
+      }
+    } else {
+      seatIndex = await this.getNextAvailableSeat(matchId);
+      if (seatIndex === -1) {
+        throw new Error('Match is full');
+      }
+    }
+
+    // 添加玩家到match
+    const result = await query(`
+      INSERT INTO match_players (match_id, seat_index, player_type, player_id, player_name, status)
+      VALUES ($1, $2, $3, $4, $5, 'joined')
       RETURNING *
-    `, [playerCredentials, matchId, userId]);
-    return result.rows.length > 0 ? new MatchPlayer(result.rows[0]) : null;
+    `, [matchId, seatIndex, player.player_type, playerId, player.player_name]);
+
+    return new MatchPlayer(result.rows[0]);
   }
 
   // 按玩家记录ID更新凭证（用于AI或无userId的场景）
@@ -327,19 +278,15 @@ class MatchPlayer {
     };
   }
 
-  // 检查玩家是否可以被移除
+  // 检查玩家是否可以被移除 - 统一权限逻辑，不区分玩家类型
   canBeRemoved(requestUserId, isCreator) {
-    // AI玩家：创建者可以移除
-    if (this.player_type === 'ai') {
-      return isCreator;
+    // 创建者可以移除任何玩家
+    if (isCreator) {
+      return true;
     }
-
-    // 人类玩家：只能自己移除自己
-    if (this.player_type === 'human') {
-      return this.user_id === requestUserId;
-    }
-
-    return false;
+    
+    // 玩家可以移除自己（仅限人类玩家有user_id）
+    return this.user_id === requestUserId;
   }
 }
 

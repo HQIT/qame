@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { fetch } = require('undici');
+const { query } = require('../config/database');
 const Match = require('../models/Match');
 const MatchPlayer = require('../models/MatchPlayer');
 const Game = require('../models/Game');
@@ -19,6 +20,77 @@ function notFound(res, message) {
 }
 function serverError(res, message) {
   return res.status(500).json({ code: 500, message, data: null });
+}
+
+// 从 boardgame.io 同步 match 状态
+async function syncMatchesFromBoardgameIO() {
+  try {
+    console.log('🔄 开始同步 boardgame.io 数据...');
+    
+    // 获取所有活跃的 matches
+    const activeMatches = await Match.findAll({ status: ['waiting', 'playing'] });
+    console.log(`📊 找到 ${activeMatches.length} 个活跃 matches`);
+    
+    const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
+    
+    for (const match of activeMatches) {
+      if (!match.bgio_match_id) continue;
+      
+      try {
+        // 获取 boardgame.io 中的 match 状态
+        const bgioUrl = `${gameServerUrl}/games/${match.game_id}/${match.bgio_match_id}`;
+        const response = await fetch(bgioUrl);
+        
+        if (!response.ok) {
+          console.warn(`⚠️ 无法获取 bgio match ${match.bgio_match_id}: ${response.status}`);
+          continue;
+        }
+        
+        const bgioData = await response.json();
+        console.log(`🎮 同步 match ${match.id}: ${JSON.stringify(bgioData.ctx?.gameover || 'ongoing')}`);
+        
+        // 同步 match 状态
+        const newStatus = bgioData.ctx?.gameover ? 'finished' : 'playing';
+        if (match.status !== newStatus) {
+          await Match.updateStatus(match.id, newStatus, null, `从 boardgame.io 同步: ${match.status} → ${newStatus}`);
+          console.log(`✅ 更新 match ${match.id} 状态: ${match.status} → ${newStatus}`);
+        }
+        
+        // 同步玩家状态（简化版：检查哪些玩家还在游戏中）
+        if (bgioData.players) {
+          await syncMatchPlayers(match.id, bgioData.players);
+        }
+        
+      } catch (err) {
+        console.warn(`⚠️ 同步 match ${match.id} 失败:`, err.message);
+      }
+    }
+    
+    console.log('✅ boardgame.io 数据同步完成');
+  } catch (error) {
+    console.error('❌ 同步 boardgame.io 数据失败:', error);
+  }
+}
+
+// 同步玩家状态
+async function syncMatchPlayers(matchId, bgioPlayers) {
+  try {
+    const currentPlayers = await MatchPlayer.findByMatchId(matchId);
+    
+    // 检查哪些玩家在 boardgame.io 中已经不存在了
+    for (const player of currentPlayers) {
+      const seatIndex = player.seat_index;
+      const bgioPlayer = bgioPlayers[seatIndex];
+      
+      // 如果 boardgame.io 中该座位为空，但 api-server 中显示有人
+      if (!bgioPlayer && player.status === 'joined') {
+        console.log(`🚪 玩家 ${player.player_name} 已从 boardgame.io 中离开，更新状态`);
+        await MatchPlayer.removePlayer(matchId, player.id);
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ 同步玩家状态失败 (match: ${matchId}):`, error.message);
+  }
 }
 
 // GET /api/matches
@@ -166,125 +238,78 @@ exports.createMatch = async (req, res) => {
 exports.addPlayer = async (req, res) => {
   try {
     const { matchId } = req.params;
-    const { playerType, playerId, playerName, seatIndex, aiPlayerId } = req.body;
-    if (!playerType || !['human', 'ai'].includes(playerType)) return badRequest(res, '玩家类型必须是human或ai');
+    const { playerId, seatIndex } = req.body;
+    
+    if (!playerId) {
+      return badRequest(res, '必须提供playerId');
+    }
 
     const match = await Match.findById(matchId);
     if (!match) return notFound(res, 'Match不存在');
     if (match.status !== 'waiting') return badRequest(res, '只能在等待状态下添加玩家');
 
-    const isCreator = await Match.isCreator(matchId, req.user.id);
-    let existingPlayer = null;
-    let targetSeatIndex = seatIndex;
-
-    if (playerType === 'human') {
-      if (playerId && playerId !== req.user.id) return forbidden(res, '不能添加其他用户作为玩家');
-      existingPlayer = await MatchPlayer.findByUserAndMatch(req.user.id, matchId);
-      if (existingPlayer) {
-        if (existingPlayer.status === 'joined') return badRequest(res, '您已经在此match中');
-      }
-      const active = await MatchPlayer.findActiveMatchesByUserId(req.user.id);
-      if (active.length > 0) return badRequest(res, `您已经在另一个match中（ID: ${active[0].match_id.substring(0, 8)}...），请先离开该match再加入新的match`);
-    } else if (playerType === 'ai') {
-      if (!isCreator) return forbidden(res, '只有创建者可以添加AI玩家');
-      if (!aiPlayerId) return badRequest(res, 'AI玩家必须提供aiPlayerId');
-      if (!playerName) return badRequest(res, 'AI玩家必须提供playerName');
-      // AI玩家信息通过aiPlayerId从ai-manager获取
+    // 验证玩家存在
+    const result = await query('SELECT * FROM players WHERE id = $1', [playerId]);
+    if (result.rows.length === 0) {
+      return notFound(res, '玩家不存在');
     }
-
-    if (targetSeatIndex === undefined || targetSeatIndex === null) {
-      targetSeatIndex = await MatchPlayer.getNextAvailableSeat(matchId);
-      if (targetSeatIndex === -1) return badRequest(res, 'Match已满');
-    } else {
-      const isSeatAvailable = await MatchPlayer.isSeatAvailable(matchId, targetSeatIndex);
-      if (!isSeatAvailable) {
-        return badRequest(res, '指定座位已被占用');
-      }
-    }
-
-    // 统一 player_name：前端已传递正确的playerName
-    const resolvedPlayerName = playerName || (playerType === 'human' ? req.user.username : 'AI Player');
-
-    const playerData = {
-      matchId,
-      seatIndex: targetSeatIndex,
-      playerType,
-      playerName: resolvedPlayerName,
-    };
+    const player = result.rows[0];
     
-    if (playerType === 'human') {
-      playerData.userId = req.user.id;
-    } else if (playerType === 'ai') {
-      playerData.aiPlayerId = aiPlayerId;
+    // 权限检查：创建者可以添加任何玩家，普通用户只能添加自己的玩家
+    const isCreator = await Match.isCreator(matchId, req.user.id);
+    const isOwnPlayer = player.user_id === req.user.id;
+    
+    if (!isCreator && !isOwnPlayer) {
+      return forbidden(res, '没有权限添加该玩家');
     }
-    // AI不再写入 aiTypeId
-
-    const player = await MatchPlayer.addPlayer(playerData);
-    // AI玩家信息已通过aiPlayerId在unified players表中管理，无需额外绑定
-
+    
+    // 检查玩家是否已在其他match中
+    const activeMatches = await MatchPlayer.findActiveMatchesByPlayerId(playerId);
+    if (activeMatches.length > 0) {
+      return badRequest(res, `该玩家已在其他match中`);
+    }
+    
+    // 使用统一的添加方法
+    const addedPlayer = await MatchPlayer.addPlayerById(matchId, playerId, seatIndex);
+    
+    // 同步到boardgame.io
     try {
       const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
-      if (!bgioMatchId) throw new Error('未找到boardgame.io match ID');
-      const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
-
-      // left状态处理逻辑已删除
-
-      const joinUrl = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/join`;
-      console.log('🎯 准备加入match:', {
-        joinUrl,
-        bgioMatchId,
-        targetSeatIndex,
-        playerName: playerData.playerName
-      });
-      
-      let resp;
-      try {
-        console.log('🚀 正在发送join请求...');
-        resp = await fetch(joinUrl, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ playerID: targetSeatIndex.toString(), playerName: playerData.playerName }) 
+      if (bgioMatchId) {
+        const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
+        const joinUrl = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/join`;
+        
+        const resp = await fetch(joinUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerID: addedPlayer.seat_index.toString(),
+            playerName: addedPlayer.player_name
+          })
         });
-        console.log('📡 join响应状态:', resp.status, resp.statusText);
-      } catch (fetchError) {
-        console.error('❌ fetch请求异常:', fetchError.message);
-        throw new Error(`网络请求失败: ${fetchError.message}`);
-      }
-      
-      if (!resp.ok) {
-        const txt = await resp.text();
-        console.log('❌ join失败响应:', txt);
-        // 简化：不做预清理与重试，直接清理数据库记录并返回错误
-        await MatchPlayer.removePlayer(matchId, player.id);
-        throw new Error(`加入游戏match失败: ${resp.status} - ${txt}`);
-      } else {
-        const data = await resp.json();
-        // 加入成功后，统一为玩家写入凭证（人类与AI一致处理）
-        if (data.playerCredentials) {
-          if (playerType === 'human') {
-            await MatchPlayer.updatePlayerCredentials(matchId, req.user.id, data.playerCredentials);
-          } else if (player && player.id) {
-            await MatchPlayer.updatePlayerCredentialsByPlayerId(player.id, data.playerCredentials);
+        
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.playerCredentials) {
+            await MatchPlayer.updatePlayerCredentialsByPlayerId(addedPlayer.id, data.playerCredentials);
           }
+        } else {
+          //await MatchPlayer.removePlayer(matchId, addedPlayer.id);
+          const txt = await resp.text();
+          return serverError(res, `boardgame.io同步失败, ${resp.status} - ${txt}`);
         }
       }
-    } catch (err) {
-      await MatchPlayer.removePlayer(matchId, player.id);
-      return serverError(res, '加入游戏match失败: ' + err.message);
+    } catch (error) {
+      await MatchPlayer.removePlayer(matchId, addedPlayer.id);
+      return serverError(res, `游戏服务器连接失败 - ${error}`);
     }
 
-    const canStart = await Match.canStart(matchId);
-    if (canStart && match.auto_start) await Match.updateStatus(matchId, 'playing', req.user.id, '自动开始游戏');
-    // 主动标记为 playing 的同时，尝试触发一次 AI 检查
-    try {
-      const aiPing = await fetch(`${process.env.GAME_SERVER_URL || 'http://game-server:8000'}/ai/ping`, {
-        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || 'internal-service-secret-key-2024' }
-      });
-      await aiPing.text();
-    } catch (_) {}
+    // 检查是否可以自动开始
+    if (match.auto_start && await Match.canStart(matchId)) {
+      await Match.updateStatus(matchId, 'playing', req.user.id, '自动开始游戏');
+    }
 
-    const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
-    return res.status(201).json({ code: 200, message: '玩家添加成功', data: { ...player.getDisplayInfo(), bgioMatchId } });
+    return ok(res, addedPlayer.getDisplayInfo(), '玩家添加成功');
   } catch (error) {
     console.error('添加玩家失败:', error);
     return serverError(res, '添加玩家失败');
@@ -327,16 +352,10 @@ exports.removePlayer = async (req, res) => {
     const isCreator = await Match.isCreator(matchId, req.user.id);
     if (!player.canBeRemoved(req.user.id, isCreator)) return forbidden(res, '没有权限移除此玩家');
 
+    // 移除玩家
     await MatchPlayer.removePlayer(matchId, player.id);
-    // 若为AI，清空 ai_clients 绑定
-    try {
-      if (player.player_type === 'ai') {
-        const cfg = typeof player.ai_config === 'string' ? JSON.parse(player.ai_config || '{}') : (player.ai_config || {});
-        if (cfg.clientId) await AiClient.clearAssignmentByClientId(cfg.clientId);
-      }
-    } catch (_) {}
 
-    // 同步boardgame.io（忽略失败）
+    // 同步boardgame.io
     try {
       const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
       if (bgioMatchId) {
@@ -352,7 +371,7 @@ exports.removePlayer = async (req, res) => {
         });
       }
     } catch (e) {
-      console.warn('从boardgame.io移除玩家失败（忽略）:', e.message);
+      console.warn('boardgame.io同步失败（忽略）:', e.message);
     }
 
     return ok(res, null, '玩家移除成功');
@@ -362,72 +381,20 @@ exports.removePlayer = async (req, res) => {
   }
 };
 
-// POST /api/matches/:matchId/force-leave
-exports.forceLeavePlayer = async (req, res) => {
+// POST /api/matches/sync
+exports.syncMatches = async (req, res) => {
   try {
-    const { matchId } = req.params;
-    const { playerId } = req.body;
-
-    if (!playerId) {
-      return badRequest(res, '缺少玩家ID');
-    }
-
-    // 查找玩家记录
-    const player = await MatchPlayer.findById(playerId);
-    if (!player || player.match_id !== matchId) {
-      return notFound(res, '该玩家不在此游戏中');
-    }
-
-    if (player.status !== 'joined' && player.status !== 'ready' && player.status !== 'playing') {
-      return badRequest(res, '该玩家已不在游戏中');
-    }
-
-    // 移除玩家
-    await MatchPlayer.removePlayer(matchId, player.id);
-    // 若为AI，清空 ai_clients 绑定
-    try {
-      if (player.player_type === 'ai') {
-        const cfg = typeof player.ai_config === 'string' ? JSON.parse(player.ai_config || '{}') : (player.ai_config || {});
-        if (cfg.clientId) await AiClient.clearAssignmentByClientId(cfg.clientId);
-      }
-    } catch (_) {}
-
-    // 通知boardgame.io服务器该玩家离开
-    try {
-      const match = await Match.findById(matchId);
-      const bgioMatchId = await Match.findBgioMatchIdByMatchId(matchId);
-      if (bgioMatchId) {
-        const gameServerUrl = process.env.GAME_SERVER_URL || 'http://game-server:8000';
-        const leaveUrl = `${gameServerUrl}/games/${match.game_id}/${bgioMatchId}/leave`;
-        const leaveBody = player.player_credentials
-          ? { playerID: player.seat_index.toString(), credentials: player.player_credentials }
-          : { playerID: player.seat_index.toString() };
-        await fetch(leaveUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(leaveBody)
-        });
-      }
-    } catch (bgioError) {
-      console.error('通知boardgame.io服务器失败:', bgioError);
-      // 不影响主要操作，继续执行
-    }
-
-    const targetInfo = player.user_id 
-      ? `用户ID ${player.user_id}` 
-      : `AI ${player.player_name || `seat ${player.seat_index}`}`;
-    console.log(`🔨 管理员 ${req.user.username} 强制 ${targetInfo} 离开游戏 ${matchId}`);
+    console.log('🔄 手动触发 boardgame.io 同步:', req.user.username);
     
-    return res.json({
-      code: 200,
-      message: '玩家已被强制离开游戏',
-      data: null
-    });
-
+    await syncMatchesFromBoardgameIO();
+    
+    return ok(res, null, 'boardgame.io 数据同步完成');
   } catch (error) {
-    console.error('强制离开游戏失败:', error);
-    return serverError(res, '强制离开游戏失败');
+    console.error('手动同步失败:', error);
+    return serverError(res, '同步失败');
   }
 };
+
+
 
 

@@ -9,17 +9,17 @@ services:
       - ./nginx/ssl.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
-      - frontend
+      - lobby
       - api-server
       - game-server
     networks:
-      - boardgame-network
+      - qame-network
 
-  # 前端应用 - 包含boardgame.io客户端
-  frontend:
+  # 前端应用
+  lobby:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         REACT_APP_SERVER: https://192.168.1.156/games
         REACT_APP_API_SERVER: https://192.168.1.156
@@ -33,13 +33,13 @@ services:
       - REACT_APP_API_SERVER=https://192.168.1.156
       - REACT_APP_GAME_SERVER=https://192.168.1.156
     networks:
-      - boardgame-network
+      - qame-network
 
   # boardgame.io游戏服务器 - 专门处理游戏逻辑
   game-server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: server/Dockerfile
     image: localhost/hqit/boardgame-server:latest
     expose:
       - "8000"
@@ -56,7 +56,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - boardgame-network
+      - qame-network
 
   # API服务器 - 专门处理业务逻辑（认证、AI等）
   api-server:
@@ -86,13 +86,13 @@ services:
       - postgres
       - redis
     networks:
-      - boardgame-network
+      - qame-network
 
   # AI管理服务 - AI客户端管理和监控
   ai-manager:
     build:
-      context: ./ai-manager
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ai-manager/Dockerfile
     image: localhost/hqit/boardgame-ai-manager:latest
     expose:
       - "3002"
@@ -109,7 +109,7 @@ services:
       - api-server
       - postgres
     networks:
-      - boardgame-network
+      - qame-network
     restart: unless-stopped
 
   # LLM AI服务 - 基于LLM的AI游戏客户端示例
@@ -125,7 +125,7 @@ services:
     environment:
       - NODE_ENV=development
     networks:
-      - boardgame-network
+      - qame-network
     restart: unless-stopped
   
   llm-ai-service2:
@@ -138,7 +138,7 @@ services:
       - NODE_ENV=development
       - LLM_MODEL=ecnu-reasoner
     networks:
-      - boardgame-network
+      - qame-network
     restart: unless-stopped
 
   # PostgreSQL数据库 - 生产环境使用
@@ -153,7 +153,7 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - boardgame-network
+      - qame-network
 
   # Redis缓存 - 会话和房间状态
   redis:
@@ -163,12 +163,12 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - boardgame-network
+      - qame-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  boardgame-network:
+  qame-network:
     driver: bridge 

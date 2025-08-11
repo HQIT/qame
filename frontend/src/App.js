@@ -30,19 +30,26 @@ function App() {
         
         if (data.code === 200) {
           // token有效，设置用户信息
-          setUser(data.data);
-          // 检查是否为管理员
-          setIsAdmin(data.data.role === 'admin');
-          // 保存用户信息到sessionStorage
-          sessionStorage.setItem('user', JSON.stringify(data.data));
+          const userData = data.data;
           
-          // 用户认证成功后立即发送心跳，标记为在线
+          // 立即获取用户的player信息
           try {
-            await api.sendHeartbeat();
-            console.log('✅ 用户上线心跳发送成功');
+            const playerResponse = await api.getMyPlayer();
+            if (playerResponse.code === 200) {
+              userData.player = playerResponse.data;
+              console.log('✅ 用户player信息获取成功:', playerResponse.data);
+            } else {
+              console.warn('⚠️ 获取用户player信息失败:', playerResponse.message);
+            }
           } catch (error) {
-            console.warn('⚠️ 发送上线心跳失败:', error);
+            console.warn('⚠️ 获取用户player信息异常:', error);
           }
+          
+          setUser(userData);
+          // 检查是否为管理员
+          setIsAdmin(userData.role === 'admin');
+          // 保存完整用户信息（包含player）到sessionStorage
+          sessionStorage.setItem('user', JSON.stringify(userData));
         } else {
           // token无效，清除本地存储
           sessionStorage.removeItem('user');
@@ -70,16 +77,24 @@ function App() {
   }, []);
 
   const handleLogin = async (userData) => {
+    // 登录成功后立即获取用户的player信息
+    try {
+      const playerResponse = await api.getMyPlayer();
+      if (playerResponse.code === 200) {
+        userData.player = playerResponse.data;
+        console.log('✅ 登录时player信息获取成功:', playerResponse.data);
+      } else {
+        console.warn('⚠️ 登录时获取用户player信息失败:', playerResponse.message);
+      }
+    } catch (error) {
+      console.warn('⚠️ 登录时获取用户player信息异常:', error);
+    }
+    
     setUser(userData);
     setIsAdmin(userData.role === 'admin');
     
-    // 用户登录后立即发送心跳，标记为在线
-    try {
-      await api.sendHeartbeat();
-      console.log('✅ 用户登录心跳发送成功');
-    } catch (error) {
-      console.warn('⚠️ 发送登录心跳失败:', error);
-    }
+    // 保存完整用户信息（包含player）到sessionStorage
+    sessionStorage.setItem('user', JSON.stringify(userData));
   };
 
   const handleLogout = async () => {

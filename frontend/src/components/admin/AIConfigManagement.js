@@ -67,15 +67,17 @@ const AIConfigManagement = () => {
 
   const loadAvailableGames = async () => {
     try {
-      const result = await api.getAvailableGames();
+      const result = await api.getGames();
       if (result.code === 200) {
-        setAvailableGames(result.data || []);
+        // 提取游戏ID列表用于AI配置
+        const gameIds = result.data.map(game => game.id);
+        setAvailableGames(gameIds);
       } else {
-        setAvailableGames(['TicTacToe']);
+        setAvailableGames([]);
       }
     } catch (err) {
       console.error('获取游戏列表失败:', err);
-      setAvailableGames(['TicTacToe']);
+      setAvailableGames([]);
     }
   };
 

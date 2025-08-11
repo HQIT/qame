@@ -6,7 +6,6 @@ const User = require('./models/User');
 
 // 路由
 const authRoutes = require('./routes/auth');
-const aiRoutes = require('./routes/ai');
 const adminRoutes = require('./routes/admin');
 const adminAIRoutes = require('./routes/adminAI');
 const onlineRoutes = require('./routes/online');
@@ -59,7 +58,6 @@ app.get('/api/health', (req, res) => {
 
 // API路由
 app.use('/api/auth', authRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', adminAIRoutes);
 app.use('/api/online', onlineRoutes);
