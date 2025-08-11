@@ -1,0 +1,27 @@
+{
+  "name": "@qame/shared-ui",
+  "version": "1.0.0",
+  "description": "Shared UI components for QAME platform",
+  "main": "lib/index.js",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "build": "babel src --out-dir lib --copy-files",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.22.0",
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "keywords": ["qame", "ui", "components", "react"],
+  "author": "QAME Platform",
+  "license": "MIT"
+}

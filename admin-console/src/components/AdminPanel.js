@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import UserManagement from './admin/UserManagement';
-import SystemStats from './admin/SystemStats';
+
 import AIConfigManagement from './admin/AIConfigManagement';
+import GameDatabaseManagement from './admin/GameDatabaseManagement';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState(() => {
@@ -39,23 +40,7 @@ const AdminPanel = () => {
           display: 'flex',
           borderBottom: '1px solid #eee'
         }}>
-          <button
-            onClick={() => {
-              setActiveTab('stats');
-              sessionStorage.setItem('adminActiveTab', 'stats');
-            }}
-            style={{
-              padding: '15px 25px',
-              border: 'none',
-              backgroundColor: activeTab === 'stats' ? '#3498db' : 'transparent',
-              color: activeTab === 'stats' ? 'white' : '#666',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: activeTab === 'stats' ? 'bold' : 'normal'
-            }}
-          >
-            📊 系统统计
-          </button>
+
           <button
             onClick={() => {
               setActiveTab('users');
@@ -90,14 +75,32 @@ const AdminPanel = () => {
           >
             🤖 AI管理中心
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('game-db');
+              sessionStorage.setItem('adminActiveTab', 'game-db');
+            }}
+            style={{
+              padding: '15px 25px',
+              border: 'none',
+              backgroundColor: activeTab === 'game-db' ? '#3498db' : 'transparent',
+              color: activeTab === 'game-db' ? 'white' : '#666',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: activeTab === 'game-db' ? 'bold' : 'normal'
+            }}
+          >
+            🎮 游戏数据库
+          </button>
 
         </div>
 
         {/* 内容区域 */}
         <div style={{ padding: '20px' }}>
-          {activeTab === 'stats' && <SystemStats />}
+
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'ai-configs' && <AIConfigManagement />}
+          {activeTab === 'game-db' && <GameDatabaseManagement />}
         </div>
       </div>
     </div>

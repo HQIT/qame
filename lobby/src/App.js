@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import { DialogProvider } from './hooks/useDialog';
-import AdminPanel from './components/AdminPanel';
 import NewEnhancedLobby from './components/NewEnhancedLobby';
 import GameView from './components/GameView';
 
@@ -14,7 +13,7 @@ function App() {
     // 从sessionStorage恢复视图状态
     return sessionStorage.getItem('currentView') || 'lobby';
   });
-  const [isAdmin, setIsAdmin] = useState(false);
+
   const [gameState, setGameState] = useState(() => {
     // 从sessionStorage恢复游戏状态
     const savedGameState = sessionStorage.getItem('gameState');
@@ -46,21 +45,17 @@ function App() {
           }
           
           setUser(userData);
-          // 检查是否为管理员
-          setIsAdmin(userData.role === 'admin');
           // 保存完整用户信息（包含player）到sessionStorage
           sessionStorage.setItem('user', JSON.stringify(userData));
         } else {
           // token无效，清除本地存储
           sessionStorage.removeItem('user');
           setUser(null);
-          setIsAdmin(false);
         }
       } catch (error) {
         console.error('验证token失败:', error);
         sessionStorage.removeItem('user');
         setUser(null);
-        setIsAdmin(false);
       } finally {
         setLoading(false);
       }
@@ -91,7 +86,6 @@ function App() {
     }
     
     setUser(userData);
-    setIsAdmin(userData.role === 'admin');
     
     // 保存完整用户信息（包含player）到sessionStorage
     sessionStorage.setItem('user', JSON.stringify(userData));
@@ -107,9 +101,7 @@ function App() {
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('currentView');
     sessionStorage.removeItem('gameState');
-    sessionStorage.removeItem('adminActiveTab');
     setUser(null);
-    setIsAdmin(false);
     setCurrentView('lobby');
     setGameState(null);
   };
@@ -202,13 +194,11 @@ function App() {
                 游戏大厅
               </button>
               
-
-              
-              {isAdmin && (
+              {user.role === 'admin' && (
                 <button
-                  onClick={() => handleViewChange(currentView === 'admin' ? 'lobby' : 'admin')}
+                  onClick={() => window.location.href = '/admin/'}
                   style={{
-                    backgroundColor: currentView === 'admin' ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    backgroundColor: 'transparent',
                     border: '1px solid white',
                     color: 'white',
                     padding: '8px 16px',
@@ -217,7 +207,7 @@ function App() {
                     fontSize: '14px'
                   }}
                 >
-                  {currentView === 'admin' ? '返回游戏' : '管理控制台'}
+                  管理控制台
                 </button>
               )}
             </div>
@@ -241,7 +231,6 @@ function App() {
 
         {/* 主内容区域 */}
         <div style={{ flex: 1, padding: '20px' }}>
-          {currentView === 'admin' && <AdminPanel />}
           {currentView === 'lobby' && <NewEnhancedLobby onGameStart={handleGameStart} />}
           {currentView === 'game' && gameState && (
             <GameView 

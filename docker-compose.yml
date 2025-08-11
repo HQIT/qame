@@ -15,11 +15,11 @@ services:
     networks:
       - qame-network
 
-  # 前端应用
+  # 游戏大厅应用
   lobby:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: lobby/Dockerfile
       args:
         REACT_APP_SERVER: https://192.168.1.156/games
         REACT_APP_API_SERVER: https://192.168.1.156
@@ -32,6 +32,32 @@ services:
       - REACT_APP_SERVER=https://192.168.1.156/games
       - REACT_APP_API_SERVER=https://192.168.1.156
       - REACT_APP_GAME_SERVER=https://192.168.1.156
+    networks:
+      - qame-network
+
+  # 管理控制台应用
+  admin-console:
+    build:
+      context: .
+      dockerfile: admin-console/Dockerfile
+      args:
+        REACT_APP_API_SERVER: https://192.168.1.156
+        REACT_APP_GAME_SERVER: https://192.168.1.156
+    image: localhost/hqit/boardgame-admin-console:latest
+    expose:
+      - "3001"
+    environment:
+      - REACT_APP_API_SERVER=https://192.168.1.156
+      - REACT_APP_GAME_SERVER=https://192.168.1.156
+      - DB_HOST=postgres
+      - DB_NAME=boardgame_db
+      - DB_USER=boardgame_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PORT=5432
+      - JWT_SECRET=${JWT_SECRET}
+      - GAME_SERVER_URL=http://game-server:8000
+    depends_on:
+      - postgres
     networks:
       - qame-network
 

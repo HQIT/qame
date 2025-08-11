@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDialog } from '../../hooks/useDialog';
-import DialogRenderer from '../common/DialogRenderer';
+import { DialogRenderer } from '@qame/shared-ui';
 import { api } from '../../utils/api';
 
 const AIConfigManagement = () => {

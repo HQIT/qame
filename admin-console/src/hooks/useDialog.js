@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useContext, createContext } from 'react';
-import DialogRenderer from '../components/common/DialogRenderer';
+import { DialogRenderer } from '@qame/shared-ui';
 
 const DialogContext = createContext(null);
 
