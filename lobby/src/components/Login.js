@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { hashPasswordForTransmission } from '../utils/crypto';
+import { hashPasswordForTransmission } from '@qame/shared-utils';
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({

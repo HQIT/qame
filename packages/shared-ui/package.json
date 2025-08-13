@@ -8,19 +8,19 @@
     "src"
   ],
   "scripts": {
-    "build": "babel src --out-dir lib --copy-files",
-    "prepublishOnly": "npm run build"
-  },
-  "devDependencies": {
-    "@babel/cli": "^7.22.0",
-    "@babel/core": "^7.22.0",
-    "@babel/preset-env": "^7.22.0",
-    "@babel/preset-react": "^7.22.0"
+    "build": "babel src --out-dir lib --copy-files"
   },
   "peerDependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+  "devDependencies": {
+    "@babel/cli": "^7.22.0",
+    "@babel/core": "^7.22.0", 
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0"
+  },
+  "dependencies": {},
   "keywords": ["qame", "ui", "components", "react"],
   "author": "QAME Platform",
   "license": "MIT"

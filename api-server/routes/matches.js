@@ -143,9 +143,6 @@ router.delete('/:matchId', controller.deleteMatch);
 // 添加玩家到match
 router.post('/:matchId/players', controller.addPlayer);
 
-// 手动同步 boardgame.io 数据
-router.post('/sync', controller.syncMatches);
-
 // 移除玩家
 router.delete('/:matchId/players/:playerId', controller.removePlayer);
 // 管理员强制移除玩家 - 使用统一的 removePlayer 接口
@@ -388,16 +385,6 @@ router.post('/:matchId/cancel', async (req, res) => {
         message: '已结束的游戏不能取消',
         data: null
       });
-    }
-
-    // 更新状态
-    await Match.updateStatus(matchId, 'cancelled', req.user.id, '游戏被取消');
-    // 清理AI绑定
-    try {
-      const AiClient = require('../models/AiClient');
-      await AiClient.clearAssignmentByMatchId(matchId);
-    } catch (e) {
-      console.warn('取消match时清理AI绑定失败（忽略）:', e.message);
     }
 
     res.json({

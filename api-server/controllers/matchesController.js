@@ -4,7 +4,6 @@ const { query } = require('../config/database');
 const Match = require('../models/Match');
 const MatchPlayer = require('../models/MatchPlayer');
 const Game = require('../models/Game');
-const AiClient = require('../models/AiClient');
 
 function ok(res, data, message = 'OK') {
   return res.json({ code: 200, message, data });
@@ -284,7 +283,8 @@ exports.addPlayer = async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             playerID: addedPlayer.seat_index.toString(),
-            playerName: addedPlayer.player_name
+            playerName: addedPlayer.player_name,
+            data: { "hello": "world" }
           })
         });
         
@@ -328,8 +328,6 @@ exports.deleteMatch = async (req, res) => {
     const match = await Match.findById(matchId);
     if (!match) return notFound(res, 'Match不存在');
 
-    // 清理所有AI绑定（ai_clients.match_id/player_id）
-    try { await AiClient.clearAssignmentByMatchId(matchId); } catch (_) {}
     await Match.delete(matchId);
     return ok(res, null, 'Match删除成功');
   } catch (error) {
@@ -380,21 +378,3 @@ exports.removePlayer = async (req, res) => {
     return serverError(res, '移除玩家失败');
   }
 };
-
-// POST /api/matches/sync
-exports.syncMatches = async (req, res) => {
-  try {
-    console.log('🔄 手动触发 boardgame.io 同步:', req.user.username);
-    
-    await syncMatchesFromBoardgameIO();
-    
-    return ok(res, null, 'boardgame.io 数据同步完成');
-  } catch (error) {
-    console.error('手动同步失败:', error);
-    return serverError(res, '同步失败');
-  }
-};
-
-
-
-

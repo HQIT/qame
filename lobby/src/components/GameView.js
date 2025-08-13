@@ -4,7 +4,7 @@ import { SocketIO } from 'boardgame.io/multiplayer'
 import { TicTacToe, Gomoku } from '@qame/games';
 import TicTacToeBoard from '../games/TicTacToeBoard';
 import GomokuBoard from '../games/GomokuBoard';
-import { api } from '../utils/api';
+import { api } from '@qame/shared-utils';
 
 const GameView = ({ matchID, playerID, playerName, gameName = 'tic-tac-toe', onReturnToLobby }) => {
   const [matchInfo, setMatchInfo] = useState(null);

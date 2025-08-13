@@ -67,49 +67,6 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// 获取在线玩家
-router.get('/online', authenticateToken, async (req, res) => {
-  try {
-    const onlinePlayers = await Player.getOnlinePlayers();
-    
-    res.json({
-      code: 200,
-      message: '获取在线玩家成功',
-      data: {
-        players: onlinePlayers,
-        total: onlinePlayers.length
-      }
-    });
-  } catch (error) {
-    console.error('获取在线玩家失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '服务器内部错误',
-      data: null
-    });
-  }
-});
-
-// 获取玩家统计信息
-router.get('/stats', authenticateToken, async (req, res) => {
-  try {
-    const stats = await Player.getStats();
-    
-    res.json({
-      code: 200,
-      message: '获取玩家统计成功',
-      data: stats
-    });
-  } catch (error) {
-    console.error('获取玩家统计失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '服务器内部错误',
-      data: null
-    });
-  }
-});
-
 // 根据ID获取玩家详细信息
 router.get('/:playerId', authenticateToken, async (req, res) => {
   try {

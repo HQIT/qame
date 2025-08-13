@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
-import { DialogProvider } from './hooks/useDialog';
+import { DialogProvider } from '@qame/shared-ui';
 import NewEnhancedLobby from './components/NewEnhancedLobby';
 import GameView from './components/GameView';
 
-import { api } from './utils/api';
+import { api } from '@qame/shared-utils';
 
 function App() {
   const [user, setUser] = useState(null);

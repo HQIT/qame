@@ -21,17 +21,17 @@ services:
       context: .
       dockerfile: lobby/Dockerfile
       args:
-        REACT_APP_SERVER: https://192.168.1.156/games
+        REACT_APP_SERVER: https://192.168.1.156
         REACT_APP_API_SERVER: https://192.168.1.156
-        REACT_APP_GAME_SERVER: https://192.168.1.156
+        REACT_APP_GAME_SERVER: https://192.168.1.156/games
         REACT_APP_PASSWORD_SALT: ${PASSWORD_SALT}
-    image: localhost/hqit/boardgame-frontend:latest
+    image: localhost/hqit/qame-frontend:latest
     expose:
       - "3000"
     environment:
-      - REACT_APP_SERVER=https://192.168.1.156/games
+      - REACT_APP_SERVER=https://192.168.1.156
       - REACT_APP_API_SERVER=https://192.168.1.156
-      - REACT_APP_GAME_SERVER=https://192.168.1.156
+      - REACT_APP_GAME_SERVER=https://192.168.1.156/games
     networks:
       - qame-network
 
@@ -42,13 +42,14 @@ services:
       dockerfile: admin-console/Dockerfile
       args:
         REACT_APP_API_SERVER: https://192.168.1.156
-        REACT_APP_GAME_SERVER: https://192.168.1.156
-    image: localhost/hqit/boardgame-admin-console:latest
+        REACT_APP_GAME_SERVER: /games
+        REACT_APP_PASSWORD_SALT: ${PASSWORD_SALT}
+    image: localhost/hqit/qame-admin-console:latest
     expose:
       - "3001"
     environment:
       - REACT_APP_API_SERVER=https://192.168.1.156
-      - REACT_APP_GAME_SERVER=https://192.168.1.156
+      - REACT_APP_GAME_SERVER=/games
       - DB_HOST=postgres
       - DB_NAME=boardgame_db
       - DB_USER=boardgame_user
@@ -66,7 +67,7 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
-    image: localhost/hqit/boardgame-server:latest
+    image: localhost/hqit/qame-game-server:latest
     expose:
       - "8000"
     environment:
@@ -89,7 +90,7 @@ services:
     build:
       context: ./api-server
       dockerfile: Dockerfile
-    image: localhost/hqit/boardgame-api-server:latest
+    image: localhost/hqit/qame-api-server:latest
     expose:
       - "8001"
     env_file:
@@ -119,7 +120,7 @@ services:
     build:
       context: .
       dockerfile: ai-manager/Dockerfile
-    image: localhost/hqit/boardgame-ai-manager:latest
+    image: localhost/hqit/qame-ai-manager:latest
     expose:
       - "3002"
     environment:
@@ -143,7 +144,7 @@ services:
     build:
       context: ./llm-ai-service
       dockerfile: Dockerfile
-    image: localhost/hqit/boardgame-llm-ai-service:latest
+    image: localhost/hqit/qame-llm-ai-service:latest
     expose:
       - "3003"
     env_file:
@@ -155,7 +156,7 @@ services:
     restart: unless-stopped
   
   llm-ai-service2:
-    image: localhost/hqit/boardgame-llm-ai-service:latest
+    image: localhost/hqit/qame-llm-ai-service:latest
     expose:
       - "3003"
     env_file:

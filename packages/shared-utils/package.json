@@ -1,0 +1,14 @@
+{
+  "name": "@qame/shared-utils",
+  "version": "1.0.0",
+  "description": "Shared utilities for QAME project",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "echo 'No build step needed for utils'"
+  },
+  "dependencies": {},
+  "files": [
+    "src",
+    "dist"
+  ]
+}

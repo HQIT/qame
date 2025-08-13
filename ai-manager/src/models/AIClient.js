@@ -18,7 +18,7 @@ class AIClientModel {
         ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         RETURNING *
       `, [
-        id, name, endpoint, JSON.stringify(supported_games), description
+        id, name, endpoint, supported_games, description
       ]);
 
       return result.rows[0];
@@ -56,7 +56,7 @@ class AIClientModel {
 
       if (supported_games !== undefined) {
         setClause.push(`supported_games = $${paramIndex}`);
-        values.push(JSON.stringify(supported_games));
+        values.push(supported_games);
         paramIndex++;
       }
 
@@ -101,10 +101,7 @@ class AIClientModel {
         SELECT * FROM ai_clients ORDER BY created_at DESC
       `);
 
-      return result.rows.map(row => ({
-        ...row,
-        supported_games: typeof row.supported_games === 'string' ? JSON.parse(row.supported_games) : row.supported_games
-      }));
+      return result.rows;
     } catch (error) {
       console.error('获取AI客户端列表失败:', error);
       throw error;
@@ -122,11 +119,7 @@ class AIClientModel {
         return null;
       }
 
-      const row = result.rows[0];
-      return {
-        ...row,
-        supported_games: typeof row.supported_games === 'string' ? JSON.parse(row.supported_games) : row.supported_games
-      };
+      return result.rows[0];
     } catch (error) {
       console.error('获取AI客户端失败:', error);
       throw error;

@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../utils/api';
-import { useToast } from './MessageToast';
-import { useDialog } from '../hooks/useDialog';
-import DialogRenderer from './common/DialogRenderer';
-import OnlinePlayers from './OnlinePlayers';
+import { api } from '@qame/shared-utils';
+import { useDialog, DialogRenderer, useToast } from '@qame/shared-ui';
 
 const NewEnhancedLobby = ({ onGameStart }) => {
   // Toast消息系统
@@ -18,7 +15,6 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedGame, setSelectedGame] = useState('');
   const [creating, setCreating] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   // 获取数据
   useEffect(() => {
@@ -68,7 +64,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       // 并行获取数据
       const [gamesResponse, aiPlayersResponse, matchesResponse] = await Promise.all([
         api.getGames(),
-        api.getActiveAIPlayers(),
+        api.getActivePlayers(),
         api.getMatches({ gameId: selectedGame })
       ]);
 
@@ -85,7 +81,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       if (aiPlayersResponse.code === 200) {
-        setAiPlayers(aiPlayersResponse.data);
+        setAiPlayers(aiPlayersResponse.data?.players||[]);
       }
 
       if (matchesResponse.code === 200) {
@@ -136,29 +132,6 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       error('创建match失败，请检查网络连接');
     } finally {
       setCreating(false);
-    }
-  };
-
-
-  // 手动同步 boardgame.io 数据
-  const handleSyncMatches = async () => {
-    if (syncing) return;
-    
-    setSyncing(true);
-    try {
-      const response = await api.syncMatches();
-      if (response.code === 200) {
-        success('数据同步完成！');
-        // 同步完成后刷新列表
-        await fetchData();
-      } else {
-        error('同步失败: ' + response.message);
-      }
-    } catch (err) {
-      console.error('同步失败:', err);
-      error('同步失败，请检查网络连接');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -608,37 +581,10 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>🎮 游戏大厅</h1>
-        <button
-          onClick={handleSyncMatches}
-          disabled={syncing}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: syncing ? '#6c757d' : '#17a2b8',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: syncing ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          {syncing ? (
-            <>
-              <span>🔄</span>
-              <span>同步中...</span>
-            </>
-          ) : (
-            <>
-              <span>🔄</span>
-              <span>同步数据</span>
-            </>
-          )}
-        </button>
+
       </div>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', alignItems: 'start' }}>
         {/* 左侧配置面板 */}
         <div style={{ 
           backgroundColor: '#f8f9fa', 
@@ -662,50 +608,55 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
           {/* 游戏选择 */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              选择游戏类型:
-            </label>
-            <select
-              value={selectedGame}
-              onChange={(e) => setSelectedGame(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ced4da',
-                borderRadius: '4px',
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}
-            >
+            <h4 style={{ marginBottom: '15px', color: '#495057', fontWeight: 'bold' }}>
+              🎮 选择游戏类型
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {Array.isArray(games) && games.length > 0 ? games.map(game => (
-                <option key={game.id} value={game.id}>
+                <div
+                  key={game.id}
+                  onClick={() => setSelectedGame(game.id)}
+                  style={{
+                    padding: '12px 15px',
+                    backgroundColor: selectedGame === game.id ? '#007bff' : 'white',
+                    color: selectedGame === game.id ? 'white' : '#495057',
+                    border: `2px solid ${selectedGame === game.id ? '#007bff' : '#dee2e6'}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: selectedGame === game.id ? 'bold' : 'normal',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedGame !== game.id) {
+                      e.target.style.backgroundColor = '#f8f9fa';
+                      e.target.style.borderColor = '#adb5bd';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedGame !== game.id) {
+                      e.target.style.backgroundColor = 'white';
+                      e.target.style.borderColor = '#dee2e6';
+                    }
+                  }}
+                >
                   {game.displayName || game.name}
-                </option>
+                </div>
               )) : (
-                <option value="">暂无可用游戏</option>
+                <div style={{
+                  padding: '12px 15px',
+                  backgroundColor: '#f8f9fa',
+                  color: '#6c757d',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  textAlign: 'center',
+                  fontSize: '14px'
+                }}>
+                  暂无可用游戏
+                </div>
               )}
-            </select>
-          </div>
-
-          {/* 创建新Match */}
-          <div style={{ marginBottom: '20px' }}>
-            <button
-              onClick={createMatch}
-              disabled={!selectedGame || creating}
-              style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: !selectedGame || creating ? '#6c757d' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: !selectedGame || creating ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              {creating ? '创建中...' : '🎮 创建比赛'}
-            </button>
+            </div>
           </div>
         </div>
 
@@ -733,6 +684,22 @@ const NewEnhancedLobby = ({ onGameStart }) => {
               }}
             >🔄
             </button>
+            {/* 创建新Match */}
+            <button
+              onClick={createMatch}
+              disabled={!selectedGame || creating}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: !selectedGame || creating ? '#6c757d' : '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: !selectedGame || creating ? 'not-allowed' : 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {creating ? '创建中...' : '🎮 创建比赛'}
+            </button>
           </div>
           
           {(() => {
@@ -751,16 +718,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
           })()}
         </div>
 
-        {/* 最右侧在线玩家 */}
-        <div style={{ 
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
-          height: 'fit-content'
-        }}>
-          <OnlinePlayers currentUser={currentUser} />
-        </div>
+
       </div>
       <ToastContainer />
       <DialogRenderer dialogs={dialogs} />

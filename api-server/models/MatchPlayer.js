@@ -200,7 +200,7 @@ class MatchPlayer {
   }
 
   // 通过player_id添加玩家（统一接口）
-  static async addPlayerById(matchId, playerId, seatIndex) {
+  static async addPlayerById(matchId, playerId, seatIndex, data = {}) {
     // 获取玩家信息
     const playerResult = await query('SELECT * FROM players WHERE id = $1', [playerId]);
     if (playerResult.rows.length === 0) {

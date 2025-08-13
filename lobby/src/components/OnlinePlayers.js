@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../utils/api';
-import { useDialog } from '../hooks/useDialog';
+import { api } from '@qame/shared-utils';
+import { useDialog } from '@qame/shared-ui';
 
 const OnlinePlayers = ({ currentUser }) => {
   const { dialogs, confirm, success: showSuccess, error: showError } = useDialog();

@@ -83,6 +83,7 @@ export const api = {
   getAIClients: () => apiCall('/ai-manager/api/clients'),
   getAIPlayers: () => apiCall('/ai-manager/api/players'),
   getActiveAIPlayers: () => apiCall('/ai-manager/api/players/active'),
+  getActivePlayers: () => apiCall('/api/players?status=active'),
   createAIClient: (clientData) => apiCall('/ai-manager/api/clients', {
     method: 'POST',
     body: JSON.stringify(clientData)
@@ -149,6 +150,5 @@ export const api = {
 
   // 在线用户相关
   getOnlineUsers: () => apiCall('/api/online/users'),
-  getOnlineStats: () => apiCall('/api/online/stats'),
   setOffline: () => apiCall('/api/online/offline', { method: 'POST' })
 }; 

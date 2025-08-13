@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
 
     // 生成Access Token（短期）
     const accessToken = jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }  // 15分钟
     );
@@ -289,7 +289,7 @@ router.post('/refresh', async (req, res) => {
 
     // 生成新的Access Token
     const newAccessToken = jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );

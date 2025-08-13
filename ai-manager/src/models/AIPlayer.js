@@ -115,12 +115,7 @@ class AIPlayerModel {
       }
 
       const row = result.rows[0];
-      return {
-        ...row,
-        client_supported_games: typeof row.client_supported_games === 'string' 
-          ? JSON.parse(row.client_supported_games) 
-          : row.client_supported_games
-      };
+      return row;
     } catch (error) {
       console.error('获取AI玩家失败:', error);
       throw error;
@@ -146,12 +141,7 @@ class AIPlayerModel {
       }
 
       const row = result.rows[0];
-      return {
-        ...row,
-        client_supported_games: typeof row.client_supported_games === 'string' 
-          ? JSON.parse(row.client_supported_games) 
-          : row.client_supported_games
-      };
+      return row;
     } catch (error) {
       console.error('根据名称获取AI玩家失败:', error);
       throw error;

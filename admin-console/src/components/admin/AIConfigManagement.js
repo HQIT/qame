@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useDialog } from '../../hooks/useDialog';
+import { useDialog } from '@qame/shared-ui';
 import { DialogRenderer } from '@qame/shared-ui';
-import { api } from '../../utils/api';
+import { api } from '@qame/shared-utils';
 
 const AIConfigManagement = () => {
-  const [activeTab, setActiveTab] = useState('clients'); // 'clients' or 'players'
   const [clients, setClients] = useState([]);
   const [players, setPlayers] = useState([]);
   const [availableGames, setAvailableGames] = useState([]);
@@ -267,103 +266,14 @@ const AIConfigManagement = () => {
         </div>
       </div>
 
-      {/* 统计信息 */}
+      {/* 两栏布局容器 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '15px',
-        marginBottom: '20px'
+        gridTemplateColumns: '1fr 1fr',
+        gap: '20px'
       }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#3498db', marginBottom: '5px' }}>
-            {clients.length}
-          </div>
-          <div>AI客户端</div>
-        </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#27ae60', marginBottom: '5px' }}>
-            {players.length}
-          </div>
-          <div>AI玩家</div>
-        </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#f39c12', marginBottom: '5px' }}>
-            {players.filter(p => p.status === 'active').length}
-          </div>
-          <div>活跃玩家</div>
-        </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#e74c3c', marginBottom: '5px' }}>
-            {availableGames.length}
-          </div>
-          <div>支持游戏</div>
-        </div>
-      </div>
 
-      {/* 标签页 */}
-      <div style={{
-        display: 'flex',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '20px'
-      }}>
-        <div
-          onClick={() => setActiveTab('clients')}
-          style={{
-            flex: 1,
-            padding: '15px 20px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'clients' ? '#3498db' : 'white',
-            color: activeTab === 'clients' ? 'white' : '#333',
-            borderRight: '1px solid #eee'
-          }}
-        >
-          AI客户端管理
-        </div>
-        <div
-          onClick={() => setActiveTab('players')}
-          style={{
-            flex: 1,
-            padding: '15px 20px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'players' ? '#3498db' : 'white',
-            color: activeTab === 'players' ? 'white' : '#333'
-          }}
-        >
-          AI玩家管理
-        </div>
-      </div>
-
-      {/* AI客户端管理 */}
-      {activeTab === 'clients' && (
+        {/* AI客户端管理 */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
@@ -487,10 +397,8 @@ const AIConfigManagement = () => {
             </div>
           )}
         </div>
-      )}
 
-      {/* AI玩家管理 */}
-      {activeTab === 'players' && (
+        {/* AI玩家管理 */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
@@ -608,7 +516,7 @@ const AIConfigManagement = () => {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* 注册/编辑AI客户端模态框 */}
       {showCreateClientModal && (

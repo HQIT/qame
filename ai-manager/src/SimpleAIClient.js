@@ -1,5 +1,4 @@
 const io = require('socket.io-client');
-const { LLMService } = require('./LLMService');
 const { GameStateAnalyzer } = require('./GameStateAnalyzer');
 
 /**
@@ -17,7 +16,6 @@ class SimpleAIClient {
     this.socket = null;
     
     // AI服务
-    this.llmService = new LLMService(this.aiConfig);
     this.analyzer = new GameStateAnalyzer(this.gameType);
     
     // 状态管理
@@ -170,16 +168,6 @@ class SimpleAIClient {
         this.log('warn', '没有可用的移动');
         return;
       }
-      
-      // 获取AI决策
-      const move = await this.llmService.getMove(analysis);
-      
-      if (move !== null) {
-        await this.executeMove(move);
-      } else {
-        this.log('warn', 'AI未能生成有效移动');
-      }
-      
     } catch (error) {
       this.log('error', `AI决策失败: ${error.message}`);
     }
