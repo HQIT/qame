@@ -111,12 +111,9 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       setCreating(true);
 
       const response = await api.createMatch({
-        gameType: selectedGame,
+        gameId: selectedGame,
         gameConfig: {
-          allowSpectators: false
-        },
-        isPrivate: false,
-        autoStart: false
+        }
       });
 
       if (response.code === 200) {

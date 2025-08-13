@@ -13,17 +13,14 @@ class Match {
       creatorId, 
       maxPlayers, 
       minPlayers, 
-      allowSpectators = false, 
-      isPrivate = false, 
-      autoStart = false, 
       gameConfig = {} 
     } = data;
 
     const result = await query(`
-      INSERT INTO matches (id, game_id, creator_id, max_players, min_players, allow_spectators, is_private, auto_start, game_config)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO matches (id, game_id, creator_id, max_players, min_players, game_config)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [id, gameId, creatorId, maxPlayers, minPlayers, allowSpectators, isPrivate, autoStart, JSON.stringify(gameConfig)]);
+    `, [id, gameId, creatorId, maxPlayers, minPlayers, JSON.stringify(gameConfig)]);
 
     return new Match(result.rows[0]);
   }
@@ -181,12 +178,6 @@ class Match {
     `, [userId]);
 
     return result.rows.map(row => new Match(row));
-  }
-
-  // 获取match的bgio_match_id
-  static async getBgioMatchId(matchId) {
-    const result = await query('SELECT bgio_match_id FROM matches WHERE id = $1', [matchId]);
-    return result.rows.length > 0 ? result.rows[0].bgio_match_id : null;
   }
 
   // 更新match的bgio_match_id
