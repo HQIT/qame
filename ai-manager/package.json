@@ -18,6 +18,7 @@
     "node-fetch": "^2.7.0",
     "dotenv": "^16.3.1",
     "pg": "^8.11.3",
+    "boardgame.io": "^0.50.2",
     "@qame/games": "file:./packages/qame-games"
   },
   "devDependencies": {

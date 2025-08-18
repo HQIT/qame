@@ -10,6 +10,7 @@ const adminRoutes = require('./routes/admin');
 const playersRoutes = require('./routes/players');
 const gameRoutes = require('./routes/games');
 const matchesRoutes = require('./routes/matches');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/players', playersRoutes); // 新增：统一玩家管理API
+app.use('/api/ai', aiRoutes); // 新增：AI管理API
 
 app.use('/api/games', gameRoutes);
 app.use('/api/matches', matchesRoutes);

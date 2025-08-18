@@ -131,6 +131,7 @@ services:
       - DB_NAME=boardgame_db
       - DB_USER=boardgame_user
       - DB_PASSWORD=${DB_PASSWORD}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
     depends_on:
       - game-server
       - api-server

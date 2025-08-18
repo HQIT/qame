@@ -1,7 +1,3 @@
-//const { query } = require('../config/database');
-//const Match = require('../models/Match');
-//const MatchPlayer = require('../models/MatchPlayer');
-
 const ok = (res, data, message = 'OK') => {
   return res.status(200).json({ code: 200, message, data });
 }

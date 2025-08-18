@@ -21,6 +21,64 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     fetchData();
   }, [selectedGame]);
 
+  // 专门检查match状态并自动进入游戏
+  const checkMatchStatus = async () => {
+    try {
+      if (!currentUser) return;
+      
+      const matchesResponse = await api.getMatches({ gameId: selectedGame });
+      console.debug('🎮 轮询获取matches', matchesResponse);
+      
+      if (matchesResponse.code === 200) {
+        // 检查是否需要自动进入游戏  
+        const userMatch = matchesResponse.data.find(match => 
+          match.players?.some(p => p.playerName === currentUser.player?.player_name) && 
+          match.status === 'playing'
+        );
+        
+        if (userMatch) {
+          const playerInMatch = userMatch.players.find(p => p.playerName === currentUser.player?.player_name);
+          const bgioMatchId = userMatch.bgio_match_id || userMatch.id;
+          const seatIndex = playerInMatch.seatIndex.toString();
+          
+          console.log('🎮 准备进入游戏:', {
+            userMatch,
+            playerInMatch,
+            bgioMatchId,
+            seatIndex,
+            selectedGame,
+            onGameStart: typeof onGameStart
+          });
+          
+          info('游戏已开始，正在进入...');
+          onGameStart(bgioMatchId, seatIndex, currentUser.username, selectedGame);
+        }
+      }
+    } catch (error) {
+      console.error('检查match状态失败:', error);
+    }
+  };
+
+  // 智能轮询effect
+  useEffect(() => {
+    if (!currentUser) return;
+    console.debug('🎮 轮询开始', matches, currentUser);
+    
+    // 检查当前用户是否参与了某个活跃的match
+    const userInActiveMatch = matches.some(match => 
+      ['waiting', 'ready', 'playing'].includes(match.status) && 
+      match.players?.some(p => p.playerName === currentUser.player?.player_name)
+    );
+    
+    // 智能轮询：参与match时高频(1秒)，否则低频(30秒)
+    const pollInterval = userInActiveMatch ? 1000 : 30000;
+    console.debug('🎮 轮询间隔:', pollInterval);
+    
+    const interval = setInterval(checkMatchStatus, pollInterval);
+    
+    return () => clearInterval(interval);
+  }, [matches, currentUser, selectedGame]);
+
   // 检查playing状态的match是否已结束
   const checkPlayingMatches = async (playingMatches) => {
     try {
@@ -85,9 +143,6 @@ const NewEnhancedLobby = ({ onGameStart }) => {
       }
 
       if (matchesResponse.code === 200) {
-        console.log('🔍 获取到的matches响应:', matchesResponse);
-        console.log('🎯 matches数据:', matchesResponse.data);
-        console.log('📊 matches数量:', matchesResponse.data.length);
         setMatches(matchesResponse.data);
         
         // 自动检查所有playing状态的match，看是否需要更新为finished状态
@@ -95,8 +150,6 @@ const NewEnhancedLobby = ({ onGameStart }) => {
         if (playingMatches.length > 0) {
           checkPlayingMatches(playingMatches);
         }
-      } else {
-        console.error('❌ 获取matches失败:', matchesResponse);
       }
     } catch (error) {
       console.error('获取数据失败:', error);
@@ -200,40 +253,13 @@ const NewEnhancedLobby = ({ onGameStart }) => {
     }
   };
 
-  // 开始Match
+  // 开始Match（创建者）
   const startMatch = async (matchId) => {
     try {
-      // 获取当前match信息进行验证
-      const match = matches.find(m => m.id === matchId);
-      if (!match) {
-        error('找不到该Match');
-        return;
-      }
-
-      // 验证玩家数量
-      if (match.currentPlayerCount < match.min_players) {
-        error(`玩家数量不足！当前 ${match.currentPlayerCount} 人，至少需要 ${match.min_players} 人才能开始游戏`);
-        return;
-      }
-
-      // 验证match状态
-      if (match.status !== 'waiting') {
-        error('只有等待中的Match才能开始游戏');
-        return;
-      }
-
-      // 验证是否是创建者
-      if (!isCreator(match)) {
-        error('只有创建者可以开始游戏');
-        return;
-      }
-
       const response = await api.startMatch(matchId);
 
       if (response.code === 200) {
-        console.log('游戏开始');
-        success('游戏开始！所有玩家现在可以进入游戏了');
-        // 刷新match列表
+        success('游戏开始！所有玩家正在自动进入游戏...');
         await fetchData();
       } else {
         error(`开始失败: ${response.message}`);
@@ -246,11 +272,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
   // 获取玩家在match中的信息
   const getPlayerInMatch = (match) => {
-    if (!currentUser) return null;
-    return match.players?.find(p => 
-      p.playerType === 'human' && 
-      (p.userName === currentUser.username || p.playerName === currentUser.username)
-    );
+    if (!currentUser?.player) return null;
+    return match.players?.find(p => p.id === currentUser.player.id);
   };
 
   // 检查是否是创建者
@@ -377,7 +400,26 @@ const NewEnhancedLobby = ({ onGameStart }) => {
   const renderMatchCard = (match) => {
     const playerInMatch = getPlayerInMatch(match);
     const isMatchCreator = isCreator(match);
-    const canStart = isMatchCreator && match.currentPlayerCount >= match.min_players && match.status === 'waiting';
+    
+    // 检查是否可以开始游戏
+    const canStart = isMatchCreator && 
+      match.status === 'waiting' &&
+      match.currentPlayerCount >= match.min_players && 
+      match.currentPlayerCount <= match.max_players &&
+      match.bgio_match_id;
+      
+    // 调试信息
+    if (isMatchCreator) {
+      console.log(`🎮 开始游戏按钮检查 (Match ${match.id.substring(0, 8)}):`, {
+        isMatchCreator,
+        status: match.status,
+        playerCount: match.currentPlayerCount,
+        minPlayers: match.min_players,
+        maxPlayers: match.max_players,
+        bgioMatchId: match.bgio_match_id,
+        canStart
+      });
+    }
 
     return (
       <div
@@ -417,7 +459,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
 
           {/* 操作按钮 */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            {/* 创建者按钮 */}
+            {/* 创建者专属按钮 */}
             {isMatchCreator && (
               <>
                 {canStart && (
@@ -452,27 +494,6 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                   删除
                 </button>
               </>
-            )}
-            
-            {/* 玩家操作按钮 */}
-            {playerInMatch && match.status === 'playing' && (
-              <button
-                onClick={() => {
-                  const bgioMatchId = match.bgio_match_id || match.id;
-                  onGameStart(bgioMatchId, playerInMatch.seatIndex.toString(), currentUser?.username, selectedGame);
-                }}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-              >
-                进入游戏
-              </button>
             )}
           </div>
         </div>
@@ -528,8 +549,8 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                       {player.isAI ? '🤖' : '👤'} {player.playerName}
                       {/* 显示离开按钮：玩家自己或创建者可以移除 */}
                       {(match.status === 'waiting' && (
-                        (player.playerName === currentUser.username) ||   // 玩家自己
-                        (isMatchCreator)                                   // 或创建者
+                        (player.id === currentUser.player?.id) ||   // 玩家自己
+                        (isMatchCreator)                           // 或创建者
                       )) && (
                         <button
                           onClick={(e) => {
@@ -546,7 +567,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
                             borderRadius: '2px',
                             cursor: 'pointer'
                           }}
-                          title={player.playerName === currentUser.username ? '离开游戏' : `移除 ${player.playerName}`}
+                          title={player.id === currentUser.player?.id ? '离开游戏' : `移除 ${player.playerName}`}
                         >
                           ×
                         </button>
@@ -699,10 +720,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
             </button>
           </div>
           
-          {(() => {
-            console.log('🏠 渲染时matches状态:', matches);
-            console.log('🔢 渲染时matches.length:', matches.length);
-            return matches.length === 0 ? (
+          {matches.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                 <p>暂无可用的Match</p>
                 <p style={{ fontSize: '14px', marginTop: '10px' }}>创建一个新的Match来开始游戏吧！</p>
@@ -711,8 +729,7 @@ const NewEnhancedLobby = ({ onGameStart }) => {
               <div>
                 {matches.map(match => renderMatchCard(match))}
               </div>
-            );
-          })()}
+            )}
         </div>
 
 

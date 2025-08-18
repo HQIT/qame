@@ -7,20 +7,19 @@ class Match {
 
   // 创建新的match
   static async create(data) {
-    const { 
-      id, 
-      gameId, 
-      creatorId, 
-      maxPlayers, 
-      minPlayers, 
-      gameConfig = {} 
+    const {
+      id,
+      gameId,
+      creatorId,
+      maxPlayers,
+      minPlayers
     } = data;
 
     const result = await query(`
-      INSERT INTO matches (id, game_id, creator_id, max_players, min_players, game_config)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO matches (id, game_id, creator_id, max_players, min_players)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [id, gameId, creatorId, maxPlayers, minPlayers, JSON.stringify(gameConfig)]);
+    `, [id, gameId, creatorId, maxPlayers, minPlayers]);
 
     return new Match(result.rows[0]);
   }
@@ -99,34 +98,19 @@ class Match {
   }
 
   // 更新match状态
-  static async updateStatus(matchId, status, changedBy = null, notes = null) {
-    await query('BEGIN');
-    
-    try {
-      // 更新match状态
-      const result = await query(`
-        UPDATE matches 
-        SET status = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-        RETURNING *
-      `, [status, matchId]);
+  static async updateStatus(matchId, status) {
+    const result = await query(`
+      UPDATE matches 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `, [status, matchId]);
 
-      if (result.rows.length === 0) {
-        throw new Error('Match not found');
-      }
-
-      // 记录状态变化历史
-      await query(`
-        INSERT INTO match_status_history (match_id, status, changed_by, notes)
-        VALUES ($1, $2, $3, $4)
-      `, [matchId, status, changedBy, notes]);
-
-      await query('COMMIT');
-      return new Match(result.rows[0]);
-    } catch (error) {
-      await query('ROLLBACK');
-      throw error;
+    if (result.rows.length === 0) {
+      throw new Error('Match not found');
     }
+
+    return new Match(result.rows[0]);
   }
 
   // 删除match
@@ -157,11 +141,20 @@ class Match {
   static async canStart(matchId) {
     const match = await this.findById(matchId);
     if (!match || match.status !== 'waiting') {
-      return false;
+      return { canStart: false, reason: 'Match不存在或状态不正确' };
+    }
+
+    // 检查boardgame.io match ID是否存在
+    if (!match.bgio_match_id) {
+      return { canStart: false, reason: 'boardgame.io match ID不存在' };
     }
 
     const playerCount = await this.getPlayerCount(matchId);
-    return playerCount >= match.min_players && playerCount <= match.max_players;
+    if (playerCount < match.min_players || playerCount > match.max_players) {
+      return { canStart: false, reason: `玩家数量不符合要求 (当前${playerCount}人，需要${match.min_players}-${match.max_players}人)` };
+    }
+
+    return { canStart: true, reason: null };
   }
 
   // 获取用户的活跃matches
