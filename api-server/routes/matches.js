@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const router = express.Router();
 const {ok, badRequest, forbidden, notFound, serverError} = require('./_base');
 const Game = require('../models/Game');
 
@@ -9,6 +8,9 @@ const Game = require('../models/Game');
 const Match = require('../models/Match');
 const MatchPlayer = require('../models/MatchPlayer');
 const { fetch } = require('undici');
+const { query } = require('../config/database');
+
+const router = express.Router();
 
 // 更新match状态（内部服务调用，无需认证）
 router.put('/:matchId/status', async (req, res) => {
@@ -26,7 +28,7 @@ router.put('/:matchId/status', async (req, res) => {
     
     console.log(`🔄 [Match API] 更新状态: ${matchId} -> ${status}`);
     
-    await Match.updateStatus(matchId, status, null, notes);
+    await Match.updateStatus(matchId, status);
     
     res.json({
       code: 200,
@@ -154,7 +156,7 @@ router.post('/', async (req, res) => {
     } catch (err) {
       console.error('❌ 创建boardgame.io match过程失败:', err.message);
       console.log('设置数据库中的match记录status=error:', matchId);
-      await Match.updateStatus(matchId, 'error', 'system', err.message);
+      await Match.updateStatus(matchId, 'error');
       return serverError(res, '创建游戏match失败: ' + err.message);
     }
 
@@ -348,11 +350,6 @@ router.post('/:matchId/players', async (req, res) => {
       return serverError(res, `游戏服务器连接失败 - ${error}`);
     }
 
-    // 检查是否可以自动开始
-    if (match.auto_start && await Match.canStart(matchId)) {
-      await Match.updateStatus(matchId, 'playing', req.user.id, '自动开始游戏');
-    }
-
     return ok(res, addedPlayer.getDisplayInfo(), '玩家添加成功');
   } catch (error) {
     console.error('添加玩家失败:', error);
@@ -403,6 +400,7 @@ router.delete('/:matchId/players/:playerId', async (req, res) => {
   }
 });
 
+
 // 开始match
 router.post('/:matchId/start', async (req, res) => {
   try {
@@ -419,17 +417,13 @@ router.post('/:matchId/start', async (req, res) => {
       return forbidden(res, '只有创建者可以开始游戏');
     }
 
-    // 检查是否可以开始
-    const canStart = await Match.canStart(matchId);
-    if (!canStart) {
-      return badRequest(res, 'Match不满足开始条件');
+    // 检查是否可以开始（合并了所有检查逻辑）
+    const startCheck = await Match.canStart(matchId);
+    if (!startCheck.canStart) {
+      return badRequest(res, startCheck.reason);
     }
 
-    // 获取match的bgio_match_id
     const bgioMatchId = match.bgio_match_id;
-    if (!bgioMatchId) {
-      return badRequest(res, 'boardgame.io match ID不存在');
-    }
 
     // 初始化boardgame.io游戏状态 - 通过模拟第一个玩家的连接
     try {
@@ -469,7 +463,7 @@ router.post('/:matchId/start', async (req, res) => {
     }
 
     // 更新数据库状态并设置started_at
-    await Match.updateStatus(matchId, 'playing', req.user.id, '自动开始游戏');
+    await Match.updateStatus(matchId, 'playing');
     
     console.log('✅ [Start Match] 游戏已开始，match:', matchId, 'bgio:', bgioMatchId);
 
@@ -548,7 +542,7 @@ router.post('/:matchId/check-game-status', async (req, res) => {
         console.log('检测到游戏结束:', gameState.ctx.gameover);
         
         // 更新match状态为finished
-        await Match.updateStatus(matchId, 'finished', req.user.id, `游戏结束: ${JSON.stringify(gameState.ctx.gameover)}`);
+        await Match.updateStatus(matchId, 'finished');
         
         return res.json({
           code: 200,

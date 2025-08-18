@@ -249,45 +249,6 @@ router.get('/players/:playerId/supports/:gameType', async (req, res) => {
   }
 });
 
-// ========== 统计信息 ==========
-
-// 获取统计信息
-router.get('/stats', async (req, res) => {
-  try {
-    const [clients, players, activePlayers] = await Promise.all([
-      AIClientModel.getAll(),
-      AIPlayerModel.getAll(),
-      AIPlayerModel.getActive()
-    ]);
-    
-    const stats = {
-      clients: {
-        total: clients.length,
-        by_games: {}
-      },
-      players: {
-        total: players.length,
-        active: activePlayers.length,
-        inactive: players.length - activePlayers.length
-      }
-    };
-    
-    // 统计每个游戏的支持情况
-    clients.forEach(client => {
-      client.supported_games.forEach(game => {
-        if (!stats.clients.by_games[game]) {
-          stats.clients.by_games[game] = 0;
-        }
-        stats.clients.by_games[game]++;
-      });
-    });
-    
-    res.json(formatResponse(200, '获取成功', stats));
-  } catch (error) {
-    res.status(500).json(formatResponse(500, '获取失败', error.message));
-  }
-});
-
 // ========== 健康检查 ==========
 
 // 健康检查

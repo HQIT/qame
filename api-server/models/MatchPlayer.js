@@ -5,8 +5,6 @@ class MatchPlayer {
     Object.assign(this, data);
   }
 
-
-
   // 获取match的所有玩家
   static async findByMatchId(matchId) {
     const result = await query(`
@@ -266,6 +264,7 @@ class MatchPlayer {
     return {
       id: this.id,
       seatIndex: this.seat_index,
+      playerId: this.player_id,
       playerType: this.player_type,
       playerName: this.player_name,
       status: this.status,

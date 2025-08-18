@@ -13,9 +13,6 @@ RUN npm install --production
 
 # 复制ai-manager源代码
 COPY ai-manager/src ./src
-COPY ai-manager/public ./public
-
-# 使用root用户运行，简化Docker权限管理
 
 # 暴露端口
 EXPOSE 3002

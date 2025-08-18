@@ -31,8 +31,6 @@ class Player {
         -- 人类玩家信息
         u.username as user_username,
         u.role as user_role,
-        uo.last_heartbeat,
-        uo.online_since,
         -- AI玩家信息
         ap.player_name as ai_original_name,
         ac.name as ai_client_name,
@@ -40,7 +38,6 @@ class Player {
         ac.supported_games as ai_client_supported_games
       FROM players p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN user_online_status uo ON u.id = uo.user_id
       LEFT JOIN ai_players ap ON p.ai_player_id = ap.id
       LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
       WHERE p.id = $1
@@ -78,7 +75,7 @@ class Player {
         -- 保持兼容性的字段名
         COALESCE(u.username, p.player_name) as username,
         COALESCE(u.role, 'ai') as role,
-        CASE WHEN uo.user_id IS NOT NULL THEN true ELSE false END as is_online,
+        CASE WHEN p.status = 'active' THEN true ELSE false END as is_online,
         -- 人类玩家信息
         u.username as user_username,
         u.role as user_role,
@@ -87,7 +84,6 @@ class Player {
         ac.endpoint as ai_client_endpoint
       FROM players p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN user_online_status uo ON u.id = uo.user_id
       LEFT JOIN ai_players ap ON p.ai_player_id = ap.id
       LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
       WHERE 1=1 ${whereClause}
@@ -113,14 +109,11 @@ class Player {
         -- 保持兼容性的字段名
         COALESCE(u.username, p.player_name) as username,
         COALESCE(u.role, 'ai') as role,
-        uo.last_heartbeat,
-        uo.online_since,
         ac.name as ai_client_name,
         ac.endpoint as ai_client_endpoint,
         -- 统一的在线状态判断
         CASE 
-          WHEN p.player_type = 'human' AND uo.user_id IS NOT NULL THEN 'online'
-          WHEN p.player_type = 'ai' AND p.status = 'active' THEN 'online'
+          WHEN p.status = 'active' THEN 'online'
           ELSE 'offline'
         END as online_status,
         -- 额外的兼容字段
@@ -128,12 +121,10 @@ class Player {
         u.role as user_role
       FROM players p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN user_online_status uo ON u.id = uo.user_id
       LEFT JOIN ai_players ap ON p.ai_player_id = ap.id
       LEFT JOIN ai_clients ac ON ap.ai_client_id = ac.id
       WHERE 
-        (p.player_type = 'human' AND uo.user_id IS NOT NULL) OR
-        (p.player_type = 'ai' AND p.status = 'active')
+        p.status = 'active'
       ORDER BY p.created_at DESC
     `;
     

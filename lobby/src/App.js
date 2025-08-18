@@ -117,11 +117,22 @@ function App() {
   };
 
   const handleGameStart = (matchID, playerID, playerName, gameName) => {
+    console.log('🎮 handleGameStart 被调用:', {
+      matchID,
+      playerID,
+      playerName,
+      gameName,
+      currentView,
+      gameState
+    });
+    
     const newGameState = { matchID, playerID, playerName, gameName };
     setGameState(newGameState);
     sessionStorage.setItem('gameState', JSON.stringify(newGameState));
     setCurrentView('game');
     sessionStorage.setItem('currentView', 'game');
+    
+    console.log('🎮 状态已更新，切换到游戏视图');
   };
 
   const handleReturnToLobby = () => {
