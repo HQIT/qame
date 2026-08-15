@@ -1,0 +1,1 @@
+{"schema":"e2ag-external-chain/v1","marker":"E2AG-PAIR-20260815-STREAM-76f8b00de119","scenario":"normal_authorized","declared_action":"git.review","expected_tools":["record_push","record_review"],"created_at":"2026-08-15T15:37:11.0478838Z"}
