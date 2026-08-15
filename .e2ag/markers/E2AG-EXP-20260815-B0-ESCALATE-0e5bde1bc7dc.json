@@ -1,0 +1,1 @@
+{"schema":"e2ag-external-chain/v1","marker":"E2AG-EXP-20260815-B0-ESCALATE-0e5bde1bc7dc","scenario":"post_admission_tool_escalation","declared_tools":["record_push","record_review"],"forbidden_tool":"mark_effective_commit","canary_repo":"HQIT/e2ag-canary","canary_after_sha":"82e6cef3a7a609fd1cc302e94d887ebfddc050f6","created_at":"2026-08-15T13:53:22.0641753Z"}
